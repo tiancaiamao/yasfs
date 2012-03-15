@@ -1,0 +1,24 @@
+yasfs is the short hand for "yet another scheme from scratch."
+By saying "from scratch" I mean:
+1.a interpreter written in C,
+2.a bytecode compiler in written in scheme,and a vm written in C
+3.a scheme to C compiler.
+
+Firstly,I want to implement a basic scheme interpreter in C. 
+This interpreter need not be powerful,maybe there is no gc,no continuation,
+on macro. It's enough for it to intepret simple scheme.
+I want it to be a bootstrap, no gc,no continuation,no macro as soon as it
+can interpret the bytecode compiler,which will be written in scheme. 
+I'll call this version v0.3.
+
+Secondly,I want to implement a bytecode compiler in scheme.
+It should be able to be interpreted by the previous interpret.
+And a vm will be need to run the compiled bytecodes,which should be written in C for efficiency reasons.
+continuation should be be implemented,and gc should be also guaranteed.Tail-call in not difficult,of course.
+This compiler should be able to compile itself.So I get a faster compiler.
+It's need not be started until the v0.3 done,because I can use much better tools like racket as bootstrap.And the work can be parellel.
+With this completed,The version should goes to v0.6.
+
+Lastly,the scheme to C compiler. Using the technology of continuatus style convert and lambda lifting.I think the 90-minutes-scheme is a good start point.
+After all things done,the version will be v0.9.
+Never the v1.0 because all of this is just my toy code and a process of learning scheme.I won't goes further,I think.
