@@ -1,0 +1,9 @@
+引入了continuation，实现了call/cc函数
+
+(if (call-with-current-continuation (lambda (cont) (set! cc cont) #t)) "one-way" "other-way")
+(cc #f) 可以看到正确的结果 "other-way"
+
+(define cc 1)
+(call-with-current-continuation (lambda (cont) (set! cc cont)))
+(begin 1 2 (cc 33) 4)
+
