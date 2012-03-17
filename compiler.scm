@@ -1,7 +1,11 @@
+#lang racket
+;;(provide r5rs)
 (define *env* '())
+(define *quote* '())
 (define env-init-compiletime '())
 (define env-global-compiletime '())
 (define env-global-runtime (make-vector 200 '()))
+(define scheme-unspecified (cons 'special 'unspecified))
 
 (define (init-core-form)
   (define (add-syntax name)
@@ -11,7 +15,8 @@
   (add-syntax 'if)
   (add-syntax 'set!)
   (add-syntax 'lambda)
-  (add-syntax 'quote))
+  (add-syntax 'quote)
+  (add-syntax 'define))
 
 (define (init-primitive-form)
   (define (add-primitive name address arity)
@@ -30,8 +35,18 @@
     (vector-set! env-global-runtime index value)))
 (global-define 'test 35)
 
-(define (CONSTANT v)
-  (list 'CONSTANT v))
+(define (CONSTANT value)
+  (cond ((eq? value #t) '(CONSTANT_TRUE))
+	((eq? value #f) '(CONSTANT_FALSE))
+	((eq? value '()) '(CONSTANT_NULL))
+   ((eq? value scheme-unspecified) '(CONSTANT_UNSPECIFIED))
+	((and (number? value)
+	      (>= value 0)
+	      (< value 255)) `(CONSTANT_NUM ,value))
+	(else
+	 (begin
+	   (set! *quote* (cons value *quote*))
+	   `(CONSTANT_QUOTE ,(- (length *quote*) 1))))))
 
 (define (PREDEFINED v)
   (list 'PREDEFINED v))
@@ -39,10 +54,22 @@
 (define (GLOBAL-REF i)
   (list 'GLOBAL-REF i))
 
-(define (GOTO len)
-  (list 'GOTO len))
-(define (JUMP-FALSE len mm2 v3)
-  (cons 'JUMP-FALSE (append mm2 v3)))
+(define (GOTO offset)
+  (cond ((< offset 255) (list 'GOTO offset))
+        ((< offset (+ 255 (* 255 256))) 
+         (let ((offset1 (modulo offset 256))
+               (offset2 (quotient offset 256)) )
+           (list 'GOTO_LONG offset1 offset2) ) )
+        (else (compile-wrong "too long jump")) ) )
+
+(define (JUMP-FALSE offset)
+  (cond ((< offset 255) (list 'JUMP_FALSE offset))
+        ((< offset (+ 255 (* 255 256))) 
+         (let ((offset1 (modulo offset 256))
+               (offset2 (quotient offset 256)) )
+           (list 'JUMP_FALSE_LONG offset1 offset2) ) )
+        (else (compile-wrong "too long jump")) ) )
+
 (define (ALTERNATIVE v1 v2 v3)
   (let ((mm2 (append v2 (GOTO (length v3)))))
     (append v1 (JUMP-FALSE (length mm2)) mm2 v3) ) )
@@ -50,7 +77,7 @@
 (define (SEQUENCE v1 v2)
   (append v1 v2))
 (define (GLOBAL-SET i v)
-  (list 'GLOBAL-SET i))
+  (append v (list 'GLOBAL-SET i)))
 
 (define (SHALLOW-ARGUMENT-REF j)
   (list 'SHALLOW-ARGUMENT-REF j))
@@ -67,8 +94,12 @@
   (lambda () (address (m1))) )
 
 (define (CALL2 address m1 m2)
-  (lambda () (let ((v1 (m1))) 
-               (address v1 (m2)) )) )
+  (append
+   m1
+   (list 'ARG1)
+   m2
+   (list 'ARG2)
+   `(PRIMITIVE_CALL2 ,address)))
 
 (define (CALL3 address m1 m2 m3)
   (lambda () (let* ((v1 (m1))
@@ -76,13 +107,14 @@
                (address v1 v2 (m3)) )) )
 ;;函数调用规则：由调用者准备好参数。由被调函数切换环境绑定。由调用者恢复环境
 (define (CLOSURE code arity)
-  (lambda ()
-    (define (function frame)
-      (if (= arity (vector-length frame))
-	  (begin (set! *env* (cons frame *env*))
-		 (code))
-	  (runtime-wrong "Incorrect number of arity")))
-    (cons function *env*)))
+  (let ((the-code
+         (append (list 'CHANGE_ENV)
+                 code
+                 (list 'RETURN))))
+    (append (list 'CREATE_CLOSURE)
+            (GOTO (length the-code))
+            the-code)))
+
 (define (invoke closure arg)
   (let ((function (car closure))
 	(frame (cdr closure)))
@@ -91,17 +123,19 @@
   (lambda ()
     (invoke (op) (arg))))
 (define (CALL op arg)
-  (lambda ()
-    (let ((save *env*))
-      (let ((result (invoke (op) (arg))))
-	(set! *env* save)
-	result))))
+  (append op
+          'VAL_FUN
+          arg
+          'ENV_STACK
+          'INVOKE
+          'STACK_ENV))
+
 (define (STORE-ARGUMENT m m* pos)
-  (lambda ()
-    (let ((v (m))
-	  (vec (m*)))
-      (vector-set! vec pos v)
-      vec)))
+  (append m
+          (list 'STACK_PUSH)
+          m*
+          (list 'SET_FRAME_ARGUMENT pos)))
+
 (define (ALLOCATE-FRAME size)
   (list 'ALLOCATE-FRAME size))
 
@@ -163,32 +197,61 @@
 		(v2 (compile-begin (cdr form) env tail?)))
 	    (SEQUENCE v1 v2))
 	  (compile (car form) env tail?))
-      (CONSTANT (begin))))
+      (CONSTANT scheme-unspecified)))
+
+(define (compile-define-global name form env tail?)
+  (let  ((locate (global-variable? env-global-compiletime name)))
+    (if locate
+        (GLOBAL-SET (cdr locate) (compile form env #f))
+        (begin 
+          (global-define name scheme-unspecified)
+          (compile-define-global name form env tail?)))))
+          
+#|(define (compile-define-inner name form env tail?)
+  (define (helper name lst idx)
+    (cond ((null? lst) #f)
+          ((eqv? (car lst) name) idx)
+          (else
+           (helper name (cdr lst) (+ idx 1)))))
+  (let ((locate (helper name (car env) 0))
+        (value (compile form env #f)))
+    (if locate
+        (SHALLOW-ARGUMENT-SET locate value)
+        (begin 
+          (set-car! env (cons name (car env)))
+          (compile-define-inner name form env tail?)))))     
+|#  
+(define (compile-define name form env tail?)
+  (if (null? env)
+      (compile-define-global name form env tail?)
+      (compile-set name form env tail?)))
+  
 (define (compile-set name form env tail?)
   (let ((value (compile form env #f))
-	(kind (compute-kind env name)))
+        (kind (compute-kind env name)))
     (if kind
-	(case (car kind)
-	  ((local) 
-	   (let ((i (cadr kind))
-		 (j (cddr kind)))
-	     (if (= i 0)
-		 (SHALLOW-ARGUMENT-SET j value)
-		 (DEEP-ARGUMENT-SET i j value))))
-	  ((global) 
-	   (GLOBAL-SET (cdr kind) value))
-	  ((predefined) 
-	   (compile-wrong "Immutable predefined variable")))
-	(compile-wrong "No such variable"))))
+        (case (car kind)
+          ((local) 
+           (let ((i (cadr kind))
+                 (j (cddr kind)))
+             (if (= i 0)
+                 (SHALLOW-ARGUMENT-SET j value)
+                 (DEEP-ARGUMENT-SET i j value))))
+          ((global) 
+           (GLOBAL-SET (cdr kind) value))
+          ((predefined) 
+           (compile-wrong "Immutable predefined variable")))
+        (compile-wrong "No such variable"))))
 (define (extend-env env names)
   (cons names env))
+
 (define (compile-lambda names body env tail?)
   (let* ((arity (length names))
 	 (new-env (extend-env env names))
 	 (v (compile-begin body new-env #t)))
-    (if (procedure? v)
-	(CLOSURE v arity)
-	(compile-wrong "Compile lambda error:can't compile body of lambda"))))
+    (CLOSURE v arity)))
+   ;;     (compile-wrong "Compile lambda error:can't compile body of lambda"))))
+
 (define (compile-argument-recurse e e* env size pos tail?)
   (let ((v (compile e env #f))
 	(v* (compile-argument e* (- size 1) (+ pos 1) env tail?)))
@@ -241,8 +304,8 @@
 			((if) (compile-if (car other) (cadr other) (caddr other) env tail?))
 			((begin) (compile-begin other env tail?))
 			((set!) (compile-set (car other) (cadr other) env tail?))
-			((lambda) (compile-lambda (car other) (cdr other) env tail?))))
-		     ;;		       ((define) (compile-define other))))
+			((lambda) (compile-lambda (car other) (cdr other) env tail?))
+                   ((define) (compile-define (car other) (cadr other) env tail?))))
 		     ((primitive) 
 		      (compile-primitive-call (cdr desc) other env tail?))
 		     ((macro) '()))))
@@ -255,5 +318,5 @@
   (if (pair? form)
       (compile-application (car form) (cdr form) env tail?)
       (if (symbol? form)
-	  (compile-variable form env tail?)
-	  (CONSTANT form))))
+          (compile-variable form env tail?)
+          (CONSTANT form))))
