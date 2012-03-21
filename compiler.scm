@@ -349,7 +349,7 @@
       (display ";;global size" out) (newline out)
       (write global-size out) (newline out) (newline out)
       (display ";;code" out) (newline out)
-      (write code out) )) #:exists 'replace)
+      (write code out) )))
     
 (define (compile-file filename)
   (set! env-global-compiletime '())
