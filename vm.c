@@ -475,7 +475,10 @@ object_t vm_eval(struct vm *vm,object_t code,object_t constant,object_t global)
 			++(vm->pc);
 			break;
 		case ALLOCATE_FRAME:
-			vm->value = make_vector(unbox(*(vm->pc)));
+			if(unbox(*(vm->pc)) != unbox(vm->func->arity))
+				goto error;
+			else
+				vm->value = make_vector(unbox(vm->func->size));
 			++(vm->pc);
 			break;
 		case SET_FRAME_ARGUMENT:
@@ -505,7 +508,7 @@ object_t vm_eval(struct vm *vm,object_t code,object_t constant,object_t global)
 			vm->func = vm->value;
 			break;
 		case CREATE_CLOSURE:
-			vm->value = make_closure(vm->pc+2,vm->env);
+			vm->value = make_closure(vm->pc+4,vm->env,(vm->pc)[0],(vm->pc)[1]);
 			break;
 		case CHANGE_ENV:
 			vm->value = make_env(closure_env(vm->func),vm->value);
@@ -537,6 +540,12 @@ object_t vm_eval(struct vm *vm,object_t code,object_t constant,object_t global)
 			break;
 		case SHALLOW_ARGUMENT_REF:
 			vm->value = vector_ref(env_frame(vm->env),unbox(*(vm->pc)));
+			++(vm->pc);
+			break;
+		case CHECKED_SHALLOW_ARGUMENT_REF:
+			vm->value = vector_ref(env_frame(vm->env),unbox(*(vm->pc)));
+			if(vm->value == scheme_unspecified)
+				goto error;
 			++(vm->pc);
 			break;
 		case GLOBAL_REF:

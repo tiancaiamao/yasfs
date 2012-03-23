@@ -1,10 +1,10 @@
 #lang racket
-;;(provide r5rs)
+(require r5rs)
 (define *env* '())
 (define *quote* '())
 (define env-init-compiletime '())
 (define env-global-compiletime '())
-(define env-global-runtime (make-vector 200 '()))
+;;(define env-global-runtime (make-vector 200 '()))
 (define scheme-unspecified (cons 'special 'unspecified))
 
 (define (init-core-form)
@@ -23,7 +23,10 @@
     (let ((value `(,name predefined primitive ,id . ,arity)))
       (set! env-init-compiletime (cons value env-init-compiletime))))
   (add-primitive 'cons 0 2)
-  (add-primitive '+ 1 2))
+  (add-primitive '+ 1 2)
+  (add-primitive 'car 2 1)
+  (add-primitive 'cdr 3 1)
+  (add-primitive 'null? 4 1))
 (define (init)
   (init-core-form)
   (init-primitive-form))
@@ -31,9 +34,9 @@
 (define (global-define name value)
   (let ((index (length env-global-compiletime)))
     (set! env-global-compiletime 
-          (cons (cons name (cons 'global index)) env-global-compiletime))
-    (vector-set! env-global-runtime index value)))
-(global-define 'test 35)
+          (cons (cons name (cons 'global index)) env-global-compiletime))))
+  ;;  (vector-set! env-global-runtime index value)))
+;;(global-define 'test 35)
 
 (define (CONSTANT value)
   (cond ((eq? value #t) '(CONSTANT_TRUE))
@@ -79,19 +82,24 @@
 (define (GLOBAL-SET i v)
   (append v (list 'GLOBAL_SET i)))
 
+(define (CHECKED-SHALLOW-ARGUMENT-REF j)
+  (list 'CHECKED_ARGUMENT_REF j))
 (define (SHALLOW-ARGUMENT-REF j)
   (list 'SHALLOW_ARGUMENT_REF j))
 (define (SHALLOW-ARGUMENT-SET j value)
-  (list 'SHALLOW_ARGUMENT_SET))
+  (append value (list 'SHALLOW_ARGUMENT_SET j)))
 (define (DEEP-ARGUMENT-SET i j value)
-  (list 'DEEP-ARGUMENT-SET i j))
+  (append value (list 'DEEP-ARGUMENT-SET i j)))
 (define (DEEP-ARGUMENT-REF i j)
   (list 'DEEP-ARGUMENT-REF i j))
 (define (CALL0 address)
   (lambda () (address)) )
 
 (define (CALL1 address m1)
-  (lambda () (address (m1))) )
+  (append
+   m1
+   (list 'ARG1)
+   `(PRIMITIVE_CALL1 ,address)))
 
 (define (CALL2 address m1 m2)
   (append
@@ -102,16 +110,22 @@
    `(PRIMITIVE_CALL2 ,address)))
 
 (define (CALL3 address m1 m2 m3)
-  (lambda () (let* ((v1 (m1))
-                    (v2 (m2)) )
-               (address v1 v2 (m3)) )) )
+  (append
+   m1
+   (list 'ARG1)
+   m2
+   (list 'ARG2)
+   m3
+   (list 'ARG3)
+   `(PRIMITIVE_CALL3 ,address)))
+  
 ;;函数调用规则：由调用者准备好参数。由被调函数切换环境绑定。由调用者恢复环境
-(define (CLOSURE code arity)
+(define (CLOSURE code arity size)
   (let ((the-code
          (append (list 'CHANGE_ENV)
                  code
                  (list 'RETURN))))
-    (append (list 'CREATE_CLOSURE)
+    (append (list 'CREATE_CLOSURE arity size)
             (GOTO (length the-code))
             the-code)))
 
@@ -145,16 +159,17 @@
   (list 'ALLOCATE_FRAME size))
 
 (define (local-variable? env i name)
-  (and (pair? env)
-       (let scan ((names (car env))
-                  (j 0))
-         (cond ((pair? names)
-                (if (eqv? (car names) name)
-                    `(local ,i . ,j)
-                    (scan (cdr names) (+ j 1))))
-               ((null? names)
-                (local-variable? (cdr env) (+ i 1) name))
-               ((eqv? name names) `(local ,i . ,j))))))
+  (define (helper names j)
+    (cond ((null? names) #f)
+          (else
+           (if (eqv? (car names) name)
+               `(local ,i . ,j)
+               (helper (cdr names) (+ j 1))))))
+  (cond ((null? env) #f)
+        (else
+         (let ((names (car env)))
+          (or (helper names 0)
+              (local-variable? (cdr env) (+ i 1) name))))))
 
 (define (global-variable? list name)
   (let ((find (assv name list)))
@@ -196,13 +211,32 @@
         (v3 (compile efalse env tail?)))
     (ALTERNATIVE v1 v2 v3)))
 (define (compile-begin form env tail?)
-  (if (pair? form)
-      (if (pair? (cdr form))
-          (let ((v1 (compile (car form) env #f))
-                (v2 (compile-begin (cdr form) env tail?)))
-            (SEQUENCE v1 v2))
-          (compile (car form) env tail?))
-      (CONSTANT scheme-unspecified)))
+  (define (inner-defines lst)
+    (cond ((null? lst) '())
+          (else
+           (let ((obj (car lst)))
+             (if (and obj (pair? obj) (eqv? (car obj) 'define))
+                 (cons (if (pair? (cadr obj))
+                           (caadr obj)
+                           (cadr lst))
+                       (inner-defines (cdr lst)))
+                 (inner-defines (cdr lst)))))))
+  (define (compile-it form env tail?)
+    (if (pair? form)
+        (if (pair? (cdr form))
+            (let ((v1 (compile (car form) env #f))
+                  (v2 (compile-it (cdr form) env tail?)))
+              (SEQUENCE v1 v2))
+            (compile (car form) env tail?))
+        (CONSTANT scheme-unspecified)))
+  (if (null? env)
+      (compile-it form env tail?)
+      (let ((names (inner-defines form)))
+        (if (null? names)
+            (compile-it form env tail?)
+            (begin (set-car! env (append (car env) names))
+                   (compile-it form env tail?))))))
+        
 
 (define (compile-define-global name form env tail?)
   (let  ((locate (global-variable? env-global-compiletime name)))
@@ -227,9 +261,11 @@
           (compile-define-inner name form env tail?)))))     
 |#  
 (define (compile-define name form env tail?)
-  (if (null? env)
-      (compile-define-global name form env tail?)
-      (compile-set name form env tail?)))
+  (if (pair? name)
+      (compile-define (car name) `(lambda ,(cdr name) ,form) env tail?)    
+      (if (null? env)
+          (compile-define-global name form env tail?)
+          (compile-set name form env tail?))))
 
 (define (compile-set name form env tail?)
   (let ((value (compile form env #f))
@@ -251,11 +287,11 @@
   (cons names env))
 
 (define (compile-lambda names body env tail?)
-  (let* ((arity (length names))
-         (new-env (extend-env env names))
-         (v (compile-begin body new-env #t)))
-    (CLOSURE v arity)))
-;;     (compile-wrong "Compile lambda error:can't compile body of lambda"))))
+  (let* ((new-env (extend-env env names))
+         (v (compile-begin body new-env #t))
+	 (arity (length names))
+	 (size (length (car new-env)))) ;;note here!size is not arity because of inner define
+    (CLOSURE v arity size)))
 
 (define (compile-argument-recurse e e* env size pos tail?)
   (let ((v (compile e env #f))
@@ -378,7 +414,7 @@
       
 ;;a instruct is construct by '(name bytecode arity)
 (define instruct-table
-  '((CREATE_CLOSURE 0 0)
+  '((CREATE_CLOSURE 0 2)
     (GOTO 1 1)
     (CHANGE_ENV 2 0)
     (SHALLOW_ARGUMENT_REF 3 1)
@@ -395,5 +431,14 @@
     (SET_FRAME_ARGUMENT 14 1)
     (ENV_STACK 15 0)
     (TAIL_INVOKE 16 0)
-    (STACK_ENV 17 0)))
-    
+    (STACK_ENV 17 0)
+    (INVOKE 18 0)
+    (CONSTANT_TRUE 19 0)
+    (CONSTANT_FALSE 20 0)
+    (CONSTANT_NULL 21 0)
+    (CONSTANT_UNSPECIFIED 22 0)
+    (CHECKED_SHALLOW_ARGUMENT_REF 23 1)
+    (SHALLOW_ARGUMENT_SET 24 1)
+    (FINISH 24 0)))
+(define (export-instruct-table)
+  (for-each (lambda (obj) (display (car obj)) (display #\,) (newline)) instruct-table))
