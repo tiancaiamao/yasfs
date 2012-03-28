@@ -16,7 +16,8 @@
   (add-syntax 'set!)
   (add-syntax 'lambda)
   (add-syntax 'quote)
-  (add-syntax 'define))
+  (add-syntax 'define)
+  (add-syntax 'let))
 
 (define (init-primitive-form)
   (define (add-primitive name id arity)
@@ -201,7 +202,7 @@
           ((predefined)
            (let ((v (cdr kind)))
              (PREDEFINED v))))
-        (compile-wrong "No such variable"))))
+        (compile-wrong (string-append "No such variable: " (symbol->string form))))))
 
 (define (compile-quote v)
   (CONSTANT v))
@@ -331,6 +332,12 @@
            (compile-wrong "support atmost 3 arity privitive now!")))
         (compile-wrong "Incorrect arity for primitive"))))
 
+(define (compile-let other env tail?)
+  (let ((names (map (lambda (pair) (car pair)) (car other)))
+        (values (map (lambda (pair) (cadr pair)) (car other)))
+        (body (cdr other)))
+    (compile `((lambda ,names ,@body) ,@values) env tail?)))
+
 (define (compile-special-form type other env tail?)
   (case type
     ((quote) (compile-quote (car other)))
@@ -338,7 +345,8 @@
     ((begin) (compile-begin other env tail?))
     ((set!) (compile-set (car other) (cadr other) env tail?))
     ((lambda) (compile-lambda (car other) (cdr other) env tail?))
-    ((define) (compile-define (car other) (cadr other) env tail?))))
+    ((define) (compile-define (car other) (cadr other) env tail?))
+    ((let) (compile-let other env tail?))))
 
 (define (predefined-kind? kind)
   (and (pair? kind) (eq? (car kind) 'predefined)))

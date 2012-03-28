@@ -38,6 +38,7 @@
 (define function '())
 ;;(define env-global-runtime (make-vector 200 '()))
 (define scheme-unspecified (cons 'special 'unspecified))
+(define standard-env (cons '() '()))
 
 (define (init-core-form)
   (define (add-syntax name)
@@ -62,7 +63,6 @@
 (define (init)
   (init-core-form)
   (init-primitive-form))
-
 (define (global-define name value)
   (let ((index (length env-global-compiletime)))
     (set! env-global-compiletime 
@@ -99,11 +99,19 @@
 (define (SHALLOW-ARGUMENT-REF j)
   (c "value = SHALLOW_ARGUMENT_REF(" (number->string j) ");"))
 (define (SHALLOW-ARGUMENT-SET j value)
-  (append value (list 'SHALLOW_ARGUMENT_SET j)))
+  (append-code value (c "value = SHALLOW_ARGUMENT_SET(" (number->string j) ");")))
+(define (CHECKED-SHALLOW-ARGUMENT-REF j)
+  (append-code (c "value = SHALLOW_ARGUMENT_REF(" (number->string j) ");")
+               "if(value == scheme_unspecified)" "goto exit;"))
 (define (DEEP-ARGUMENT-SET i j value)
-  (append value (list 'DEEP-ARGUMENT-SET i j)))
+  (append-code value 
+               (c "value = DEEP_ARGUMENT_SET(" (number->string i) "," (number->string j) ");")))
 (define (DEEP-ARGUMENT-REF i j)
-  (list 'DEEP-ARGUMENT-REF i j))
+  (c "value = DEEP_ARGUMENT_REF(" (number->string i) "," (number->string j) ");"))
+(define (CHECKED-DEEP-ARGUMENT-REF i j)
+  (append-code 
+   (c "value = DEEP_ARGUMENT_REF(" (number->string i) "," (number->string j) ");")
+   "if(value == scheme_unspecified)" "goto exit;"))
 (define (CALL0 address)
   (lambda () (address)) )
 
@@ -138,7 +146,7 @@
                code
                "EXIT_CLOSURE();" "}")))
     (begin
-      (cons fun-ptr function)
+      (set! function (cons fun-ptr function))
       (c-store "make_closure(funcXXX,vm->env)")))  )
   
 (define (invoke closure arg)
@@ -170,28 +178,32 @@
 (define (ALLOCATE-FRAME size)
   (list 'ALLOCATE_FRAME size))
 
-(define (local-variable? env i name)
+(define (compute-kind env name)
+  (or (env-variable? env 0 name)
+      (predefined-variable? env-init-compiletime name)
+      (macro? name)))
+(define (macro? name)
+  #f)
+(define (env-variable? env i name)
   (define (helper names j)
     (cond ((null? names) #f)
           (else
-           (if (eqv? (car names) name)
-               `(local ,i . ,j)
-               (helper (cdr names) (+ j 1))))))
+           (cond 
+             ((eqv? (car names) name)
+              `(local ,i . ,j))
+             ((and (pair? (car names)) 
+                   (eqv? (caar names) name))
+              `(inner-define ,i ,j . ,(cdar names)))
+             (else
+              (helper (cdr names) (+ j 1)))))))
   (cond ((null? env) #f)
         (else
          (let ((names (car env)))
-          (or (helper names 0)
-              (local-variable? (cdr env) (+ i 1) name))))))
-
-(define (global-variable? list name)
+           (or (helper names 0)
+               (env-variable? (cdr env) (+ i 1) name))))))
+(define (predefined-variable? list name)
   (let ((find (assv name list)))
     (and find (cdr find))))
-
-(define (compute-kind env name)
-  (or (local-variable? env 0 name)
-      (global-variable? env-global-compiletime name)
-      (global-variable? env-init-compiletime name)))
-
 (define (compile-wrong msg)
   (display msg))
 (define (runtime-wrong msg)
@@ -207,9 +219,19 @@
              (if (= i 0)
                  (SHALLOW-ARGUMENT-REF j)
                  (DEEP-ARGUMENT-REF i j))))
-          ((global)
-           (let ((i (cdr kind)))
-             (GLOBAL-REF i)))
+          ((inner-define)
+           (let ((i (cadr kind))
+                 (j (caddr kind))
+                 (inited (cdddr kind)))
+             (cond 
+               ((and inited (= i 0))
+                (SHALLOW-ARGUMENT-REF j))
+               ((and inited (not (= i 0)))
+                (DEEP-ARGUMENT-REF i j))
+               ((= i 0)
+                (CHECKED-SHALLOW-ARGUMENT-REF j))
+               (else 
+                (CHECKED-DEEP-ARGUMENT-REF i j)))))
           ((predefined)
            (let ((v (cdr kind)))
              (PREDEFINED v))))
@@ -230,7 +252,7 @@
              (if (and obj (pair? obj) (eqv? (car obj) 'define))
                  (cons (if (pair? (cadr obj))
                            (caadr obj)
-                           (cadr lst))
+                           (cadr obj))
                        (inner-defines (cdr lst)))
                  (inner-defines (cdr lst)))))))
   (define (compile-it form env tail?)
@@ -241,43 +263,48 @@
               (SEQUENCE v1 v2))
             (compile (car form) env tail?))
         (CONSTANT scheme-unspecified)))
-  (if (null? env)
-      (compile-it form env tail?)
-      (let ((names (inner-defines form)))
-        (if (null? names)
-            (compile-it form env tail?)
-            (begin (set-car! env (append (car env) names))
-                   (compile-it form env tail?))))))
+  (let ((names (inner-defines form)))
+    (if (null? names)
+        (compile-it form env tail?)
+        (let* ((inner-define-names (map (lambda (obj) (cons obj #f)) names))
+               (new-env-names (append (car env) inner-define-names))
+               (new-env (cons new-env-names (cdr env))))
+          (compile-it form new-env tail?)))))
         
 
-(define (compile-define-global name form env tail?)
+#|(define (compile-define-global name form env tail?)
   (let  ((locate (global-variable? env-global-compiletime name)))
     (if locate
         (GLOBAL-SET (cdr locate) (compile form env #f))
         (begin 
           (global-define name scheme-unspecified)
-          (compile-define-global name form env tail?)))))
+          (compile-define-global name form env tail?)))))|#
 
-#|(define (compile-define-inner name form env tail?)
+(define (compile-define name form env tail?)
   (define (helper name lst idx)
-    (cond ((null? lst) #f)
+    (if (null? lst)
+        #f
+        (cond 
           ((eqv? (car lst) name) idx)
+          ((and (pair? (car lst)) (eqv? (caar lst) name))
+           (begin (set-cdr! (car lst) #t)
+                  idx))
           (else
-           (helper name (cdr lst) (+ idx 1)))))
+           (helper name (cdr lst) (+ idx 1))))))
   (let ((locate (helper name (car env) 0))
         (value (compile form env #f)))
     (if locate
         (SHALLOW-ARGUMENT-SET locate value)
         (begin 
           (set-car! env (cons name (car env)))
-          (compile-define-inner name form env tail?)))))     
-|#  
-(define (compile-define name form env tail?)
+          (compile-define name form env tail?)))))
+
+#|(define (compile-define name form env tail?)
   (if (pair? name)
       (compile-define (car name) `(lambda ,(cdr name) ,form) env tail?)    
       (if (null? env)
           (compile-define-global name form env tail?)
-          (compile-set name form env tail?))))
+          (compile-set name form env tail?))))|#
 
 (define (compile-set name form env tail?)
   (let ((value (compile form env #f))
@@ -290,8 +317,15 @@
              (if (= i 0)
                  (SHALLOW-ARGUMENT-SET j value)
                  (DEEP-ARGUMENT-SET i j value))))
-          ((global) 
-           (GLOBAL-SET (cdr kind) value))
+          ((inner-define)
+           (let ((i (cadr kind))
+                 (j (caddr kind))
+                 (inited (cdddr kind)))
+             (if inited
+                 (if (= i 0)
+                     (SHALLOW-ARGUMENT-SET j value)
+                     (DEEP-ARGUMENT-SET i j value))
+                 (compile-wrong "can't set undefined variable"))))
           ((predefined) 
            (compile-wrong "Immutable predefined variable")))
         (compile-wrong "No such variable"))))
@@ -471,3 +505,4 @@
     (FINISH 24 0)))
 (define (export-instruct-table)
   (for-each (lambda (obj) (display (car obj)) (display #\,) (newline)) instruct-table))
+(init)
