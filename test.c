@@ -238,10 +238,10 @@ object_t scheme_standard_environment = &scheme_null_obj;
 	stack[1] = size;\
 	stack[2] = "name";\
 	stack[3] = vm->env;\
-	vm->env = cons(vm->value,closure_env(vm->func));
+	vm->env = cons(vm->value,closure_env(vm->func))
 #define EXIT_CLOSURE()\
 	vm->ebp = stack[0];\
-	vm->env = stack[3];\
+	vm->env = stack[3]
 
 #define PUSH(v) stack[index++] = (v)
 #define POP() stack[--index]
@@ -255,6 +255,7 @@ static void funcXXX(struct vm *vm)
 	PUSH(vm->value);
 	vm->value = cons(POP(),POP());
 //...
+	EXIT_CLOSURE();
 	vm->ebp = stack[0];//恢复ebp
 	vm->env = stack[3];
 }

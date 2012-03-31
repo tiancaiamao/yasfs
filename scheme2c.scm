@@ -14,7 +14,7 @@
         ((char? exp) (c "make_character(\'"  exp "\')"))
         (else exp)))
 
-(define (c-store value) (c "value = " value ";"))
+(define (c-store value) (c "vm->value = " value ";"))
 ;; generate locals, string constants and functions.
 (define (c . strs) ;; generalized string-append
   (define (str-app str1 rest)
@@ -35,6 +35,7 @@
 (define *quote* '())
 (define env-init-compiletime '())
 (define env-global-compiletime '())
+(define macor-list '())
 (define function '())
 ;;(define env-global-runtime (make-vector 200 '()))
 (define scheme-unspecified (cons 'special 'unspecified))
@@ -49,7 +50,8 @@
   (add-syntax 'set!)
   (add-syntax 'lambda)
   (add-syntax 'quote)
-  (add-syntax 'define))
+  (add-syntax 'define)
+  (add-syntax 'def-macro))
 
 (define (init-primitive-form)
   (define (add-primitive name id arity)
@@ -99,9 +101,9 @@
 (define (SHALLOW-ARGUMENT-REF j)
   (c "value = SHALLOW_ARGUMENT_REF(" (number->string j) ");"))
 (define (SHALLOW-ARGUMENT-SET j value)
-  (append-code value (c "value = SHALLOW_ARGUMENT_SET(" (number->string j) ");")))
+  (append-code value (c "vm->value = SHALLOW_ARGUMENT_SET(" (number->string j) ");")))
 (define (CHECKED-SHALLOW-ARGUMENT-REF j)
-  (append-code (c "value = SHALLOW_ARGUMENT_REF(" (number->string j) ");")
+  (append-code (c "vm->value = SHALLOW_ARGUMENT_REF(" (number->string j) ");")
                "if(value == scheme_unspecified)" "goto exit;"))
 (define (DEEP-ARGUMENT-SET i j value)
   (append-code value 
@@ -169,14 +171,17 @@
           (list 'INVOKE)
           (list 'STACK_ENV)))
 
-(define (STORE-ARGUMENT m m* pos)
-  (append m
-          (list 'STACK_PUSH)
-          m*
-          (list 'SET_FRAME_ARGUMENT pos)))
-
-(define (ALLOCATE-FRAME size)
-  (list 'ALLOCATE_FRAME size))
+(define (STORE-ARGUMENT m m* pos func)
+  (append-code m
+               "PUSH(vm->value);"
+               m*
+               (c "vector_set(vm->value," (number->string pos) ",POP())")
+               ))
+(define (ALLOCATE-FRAME size func)
+  (append-code func
+               "vm->func = vm->value;"
+               (c "vm->value = make_vector(" (number->string size) ");")
+               ))
 
 (define (compute-kind env name)
   (or (env-variable? env 0 name)
@@ -339,26 +344,30 @@
 	 (size (length (car new-env)))) ;;note here!size is not arity because of inner define
     (CLOSURE v arity size)))
 
-(define (compile-argument-recurse e e* env size pos tail?)
-  (let ((v (compile e env #f))
-        (v* (compile-argument e* (- size 1) (+ pos 1) env tail?)))
-    (STORE-ARGUMENT v pos v*)))
-(define (compile-argument arg pos env tail?)
+(define (compile-let other env tail?)
+  (let ((names (map (lambda (pair) (car pair)) (car other)))
+        (values (map (lambda (pair) (cadr pair)) (car other)))
+        (body (cdr other)))
+    (compile `((lambda ,names ,@body) ,@values) env tail?)))
+
+(define (compile-argument arg pos env tail? func)
   (if (pair? arg)
       (let ((v (compile (car arg) env #f))
-            (v* (compile-argument (cdr arg) (+ pos 1) env tail?)))
-        (STORE-ARGUMENT v v* pos))
-      (ALLOCATE-FRAME pos)))
+            (v* (compile-argument (cdr arg) (+ pos 1) env tail? func)))
+        (STORE-ARGUMENT v v* pos func))
+      (ALLOCATE-FRAME pos func)))
 
+(define (STORE-FUNC v v*)
+  (append-code v
+               "vm->func = vm->value;"
+               v*))
+(define (CLOSURE-CALL v)
+  (append-code v
+               "CLOSURE_CALL()"))
 (define (compile-regular-application first other env tail?)
-  (let ((op (compile first env tail?))
-        (arg (compile-argument other 0 env tail?)))
-    (append-code arg op
-       "vm->func = vm->value;"
-       "vm->value = make_vector(7);"
-       "vector_set(vm->value,4,POP());"
-       "vector_set(vm->value,5,POP());"
-       "CLOSURE_CALL()")))
+  (let ((op (compile first env #f)))
+    (CLOSURE-CALL (compile-argument other 0 env tail? op))))
+    
 
 (define (compile-primitive-call info name other env tail?)
   (let ((address (car info))
@@ -401,22 +410,27 @@
     ((begin) (compile-begin other env tail?))
     ((set!) (compile-set (car other) (cadr other) env tail?))
     ((lambda) (compile-lambda (car other) (cdr other) env tail?))
-    ((define) (compile-define (car other) (cadr other) env tail?))))
+    ((define) (compile-define (car other) (cadr other) env tail?))
+    ((let) (compile-let other env tail?))))
 
 (define (predefined-kind? kind)
   (and (pair? kind) (eq? (car kind) 'predefined)))
+  
 (define (compile-application first other env tail?)
   (if (symbol? first)
       (let ((kind (compute-kind env first)))
-        (if (predefined-kind? kind)            
-            (let ((desc (cdr kind)))
-              (case (car desc)
-                ((syntax) 
-                 (compile-special-form (cdr desc) other env tail?))
-                ((primitive) 
-                 (compile-primitive-call (cdr desc) first other env tail?))
-                ((macro) '())))
-            (compile-regular-application first other env tail?)))
+        (cond 
+          ((predefined-kind? kind)            
+           (let ((desc (cdr kind)))
+             (case (car desc)
+               ((syntax) 
+                (compile-special-form (cdr desc) other env tail?))
+               ((primitive) 
+                (compile-primitive-call (cdr desc) first other env tail?)))))
+          ((macro? kind)
+           #f)
+          (else
+           (compile-regular-application first other env tail?))))
       ;;	 ((and (pair? op) (eq? (car op) 'lambda))
       ;;	  (compile-closed-application op arg env tail?))
       (compile-regular-application first other env tail?)))
@@ -438,30 +452,21 @@
               (gather (read in) (cons e content)) ) ) ) ) )
 
 
-(define (write-result-file ofilename comments global-size constants code)
+(define (write-result-file ofilename closures code)
   (call-with-output-file ofilename
     (lambda (out)
-      (for-each (lambda (comment) (display comment out)) comments)
+      (for-each (lambda (afun) 
+                  (for-each (lambda (str) (display str out) (newline out)) afun))
+                closures)
       (newline out) (newline out)
-      (display ";;constant quote" out) (newline out)
-      (write constants out) (newline out) (newline out)
-      (display ";;global size" out) (newline out)
-      (write global-size out) (newline out) (newline out)
-      (display ";;code" out) (newline out)
-      (write code out) )))
+      (display "//code" out) (newline out)
+      (for-each (lambda (str) (display str out) (newline out)) code))))
     
 (define (compile-file filename)
-  (set! env-global-compiletime '())
-  (set! *quote* '())
-  (let* ((source `(begin . ,(read-file filename)))
-         (asm-code (compile source '() #t))
-         (bytecode (assemble->bytecode asm-code))
-         (constants (apply vector *quote*))
-         (global-size (length env-global-compiletime))
-         (ofilename (string-append filename ".so")))
-    (write-result-file ofilename
-                       (list ";;Bytecode for " filename)
-                       global-size constants bytecode)))   
+  (let* ((source `((lambda () ,(read-file filename))))
+         (code (compile source standard-env #t))
+         (ofilename (string-append filename ".c")))
+    (write-result-file ofilename function code)))
 
 (define (instruct->bytecode asym)
   (let ((find (assv asym instruct-table)))
