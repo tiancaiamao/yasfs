@@ -1,0 +1,5 @@
+#ifndef MEM_H
+
+extern struct chunk *mem;
+
+#endif

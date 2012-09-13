@@ -1,0 +1,58 @@
+#include "mem.h"
+
+#define gc_mark(object) (((object)->flag) |= 0x1)
+#define gc_ismarked(object) ((((object) & 0x1) > 0)? 1:0)
+#define gc_unmark(object) (((object)->flag) &= ~0x1)
+
+void mark(object obj)
+{
+	gc_mark(obj);
+	switch(obj->flag << 1)
+	{
+	case PAIR:
+		gc_mark(obj->car);
+		gc_mark(obj->cdr);
+		break;
+	default:
+		break;
+	}
+}
+
+void sweep()
+{
+	struct chunk *ck;
+	object base;
+	object_type type;
+	struct freenode *p;
+
+	for(ck=mem; ck!=NULL; ck=ck->next)
+	{
+		base = ck->data;
+		while(base < ck+4096)
+		{
+			if(gc_ismarked(base))
+			{
+				gc_unmark(base);
+				type = base->flag >> 1;
+				switch(type)
+				{
+				case PAIR:
+					base = (char*)base+sizeof(struct object_pair);
+					continue;
+				case FIXNUM:
+					base = (char*)base + sizeof(struct object_fixnum);
+					continue;
+				default:
+					fprintf(stderr,"unknown type");
+					exit(-1);
+				}
+			}
+			else
+			{
+				base += sizeof(object);
+			}
+		}
+	}
+}
+
+gc()

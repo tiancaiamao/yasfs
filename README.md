@@ -1,0 +1,3 @@
+Some old pieces of code of Scheme Compiler I've ever wrote
+Part of this is placed in my googlecode <https://code.google.com/p/yasfs/> previously.
+NO Licence claimed. Because it's even not a usable code...

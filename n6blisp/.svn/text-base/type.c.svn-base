@@ -1,0 +1,25 @@
+typedef struct object_t
+{
+	unsigned int flag;
+}*object;
+
+struct object_pair
+{
+	unsigned int flag;
+	object car;
+	object cdr;
+};
+
+struct object_fixnum
+{
+	unsigned int flag;
+	int num;
+};
+
+typedef enum object_type_t
+{
+	PAIR = 0,
+	FIXNUM,
+
+}object_type;
+

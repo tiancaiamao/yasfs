@@ -1,0 +1,74 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+struct freenode
+{
+	struct freenode *next;
+	unsigned int size;
+};
+struct chunk
+{
+	struct chunk *next;
+	struct freenode *freelist;
+	char *data;
+};
+
+struct chunk *mem = NULL;
+
+static int mem_alloc_chunk()
+{
+	struct chunk *ck;
+	ck = malloc(4096);
+	if(ck == NULL)
+		return -1;
+	ck->next = mem;
+	mem = ck;
+	ck->freelist = chunk->data;
+	ck->freelist->next = NULL;
+	ck->>freelist->size = 4096 - sizeof(struct chunk*)-sizeof(struct freenode);
+	return 0;
+}
+
+void* mem_alloc(unsigned int size)
+{
+	struct chunk *ck;
+	struct freenode *p,*prev,*tmp;
+
+        if(size >= 4096 - sizeof(struct chunk*)-sizeof(struct freenode))
+	   return NULL;
+	for(ck = mem; ck!=NULL; ck=ck->next)
+	{
+		prev = ck->freelist;
+		p = prev->next;
+		while(p)
+		{
+			if(p->size >= size)
+			{
+				if(p->size - size < OBJECT_SMALL_SIZE)
+				{				 
+					prev->next = p->next;
+					return p;
+				}
+				else
+				{
+					tmp = (char*)p + size;
+					tmp->next = p->next;
+					prev->next = tmp;
+					return p;
+				}
+			}
+			prev = p;
+			p = p->next;
+		}
+	}
+	if(gc())		/* 如果gc后空间仍不足 */
+	{
+		if(mem_alloc_chunk() != 0)
+		{
+			fprintf(stderr,"out of memory");
+			return NULL;
+		}
+		return mem_alloc(size);
+	}
+}
+

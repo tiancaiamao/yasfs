@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 30
+/svn/!svn/ver/19/trunk/n6blisp
+END
+mem.c
+K 25
+svn:wc:ra_dav:version-url
+V 36
+/svn/!svn/ver/19/trunk/n6blisp/mem.c
+END
+type.c
+K 25
+svn:wc:ra_dav:version-url
+V 37
+/svn/!svn/ver/19/trunk/n6blisp/type.c
+END
+mem.h
+K 25
+svn:wc:ra_dav:version-url
+V 36
+/svn/!svn/ver/19/trunk/n6blisp/mem.h
+END
+gc.c
+K 25
+svn:wc:ra_dav:version-url
+V 35
+/svn/!svn/ver/19/trunk/n6blisp/gc.c
+END
+interpret.scm
+K 25
+svn:wc:ra_dav:version-url
+V 44
+/svn/!svn/ver/19/trunk/n6blisp/interpret.scm
+END
