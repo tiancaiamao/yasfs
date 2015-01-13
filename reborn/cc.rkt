@@ -1,132 +1,6 @@
 #lang racket
-(define atom?
-  (lambda (v)
-    (not (pair? v))))
-(define static-wrong 'wait)
 
-(define r.init '())
-(define (r-extend* r n*)
-  (cons n* r) )
-
-(define (local-variable? r i n)
-  (and (pair? r)
-       (let scan ((names (car r))
-                  (j 0) )
-         (cond ((pair? names) 
-                (if (eq? n (car names))
-                    `(local ,i . ,j)
-                    (scan (cdr names) (+ 1 j)) ) )
-               ((null? names)
-                (local-variable? (cdr r) (+ i 1) n) )
-               ((eq? n names) `(local ,i . ,j)) ) ) ) )
-
-(define (global-variable? g n)
-  (let ((var (assq n g)))
-    (and (pair? var)
-         (cdr var) ) ) )
-
-(define sg.current (make-vector 100))
-
-(define (g.current-extend! n)
-  (let ((level (length g.current)))
-    (set! g.current 
-          (cons (cons n `(global . ,level)) g.current) )
-    level ) )
-
-(define (global-fetch i)
-  (vector-ref sg.current i) )
-
-(define (global-update! i v)
-  (vector-set! sg.current i v) )
-
-(define (g.current-initialize! name)
-  (let ((kind (compute-kind r.init name)))
-    (if kind
-        (case (car kind)
-          ((global)
-           (vector-set! sg.current (cdr kind) 'undefined-value) )
-          (else (static-wrong "Wrong redefinition" name)) )
-        (let ((index (g.current-extend! name)))
-          (vector-set! sg.current index 'undefined-value) ) ) )
-  name )
-
-;;;ooooooooooooooooooooo
-(define (SEQUENCE m m+)
-  (append m m+) )
-(define (FIX-CLOSURE m+ arity)
-  (let* ((the-function (append (ARITY=? (+ arity 1)) (EXTEND-ENV)
-                               m+  (RETURN) ))
-         (the-goto (GOTO (length the-function))) )
-    (append (CREATE-CLOSURE (length the-goto)) the-goto the-function) ) )
-
-(define NARY-CLOSURE 'wait)
-
-(define (TR-FIX-LET m* m+)
-  (append m* (EXTEND-ENV) m+) )
-
-(define (FIX-LET m* m+)
-  (append m* (EXTEND-ENV) m+ (UNLINK-ENV)) )
-
-(define (CALL0 address)
-  (INVOKE0 address) )
-
-(define (CALL1 address m1)
-  (append m1 (INVOKE1 address) ) )
-
-(define (CALL2 address m1 m2)
-  (append m1 (PUSH-VALUE) m2 (POP-ARG1) (INVOKE2 address)) )
-
-(define (CALL3 address m1 m2 m3)
-  (append m1 (PUSH-VALUE) 
-          m2 (PUSH-VALUE) 
-          m3 (POP-ARG2) (POP-ARG1) (INVOKE3 address) ) )
-
-(define (TR-REGULAR-CALL m m*)
-  (append m (PUSH-VALUE) m* (POP-FUNCTION) (FUNCTION-GOTO)) )
-
-(define (REGULAR-CALL m m*)
-  (append m (PUSH-VALUE) m* (POP-FUNCTION) 
-          (PRESERVE-ENV) (FUNCTION-INVOKE) (RESTORE-ENV) ) )
-
-(define (STORE-ARGUMENT m m* rank)
-  (append m (PUSH-VALUE) m* (POP-FRAME! rank)) )
-(define CONS-ARGUMENT 'wait)
-(define EXPLICIT-CONSTANT 'wait)
-
-;;;oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
-;;; Determine the nature of a variable.
-;;; Three different answers. Or the variable is local (ie appears in R)
-;;; then return     (LOCAL index . depth)
-;;; global (ie created by the user) then return
-;;;                 (GLOBAL . index)
-;;; or predefined (and immutable) then return
-;;;                 (PREDEFINED . index)
-
-(define (compute-kind r n)
-  (or (local-variable? r 0 n)
-      (global-variable? g.current n)
-      (global-variable? g.init n) ) )
-
-(define g.current '())
-(define g.init '())
-(define sg.init (make-vector 100))
-
-(define (g.init-extend! n)
-  (let ((level (length g.init)))
-    (set! g.init
-          (cons (cons n `(predefined . ,level)) g.init) )
-    level ) )
-(define (g.init-initialize! name value)
-  (let ((kind (compute-kind r.init name)))
-    (if kind
-        (case (car kind)
-          ((predefined)
-           (vector-set! sg.init (cdr kind) value) )
-          (else (static-wrong "Wrong redefinition" name)) )
-        (let ((index (g.init-extend! name)))
-          (vector-set! sg.init index value) ) ) )
-  name )
-
+;;-----------------------compiler---------------------------
 (define (meaning e r tail?)
   (if (atom? e)
       (if (symbol? e) (meaning-reference e r tail?)
@@ -220,8 +94,6 @@
          (m+ (meaning-sequence e+ r2 #t)) )
     (NARY-CLOSURE m+ arity) ) )
 
-;;; Application meaning.
-
 (define (meaning-application e e* r tail?)
   (cond ((and (symbol? e)
               (let ((kind (compute-kind r e)))
@@ -242,7 +114,6 @@
 
 ;;; Parse the variable list to check the arity and detect wether the
 ;;; abstraction is dotted or not.
-
 (define (meaning-closed-application e ee* r tail?)
   (let ((nn* (cadr e)))
     (let parse ((n* nn*)
@@ -278,7 +149,6 @@
 ;;; Handles a call to a predefined primitive. The arity is already checked.
 ;;; The optimization is to avoid the allocation of the activation frame.
 ;;; These primitives never change the *env* register nor have control effect.
-
 (define (meaning-primitive-application e e* r tail?)
   (let* ((desc (get-description e))
          ;; desc = (function address . variables-list)
@@ -302,7 +172,6 @@
 
 ;;; In a regular application, the invocation protocol is to call the
 ;;; function with an activation frame and a continuation: (f v* k).
-
 (define (meaning-regular-application e e* r tail?)
   (let* ((m (meaning e r #f))
          (m* (meaning* e* r (length e*) #f)) )
@@ -337,239 +206,94 @@
 
 (define (meaning-no-dotted-argument r size arity tail?)
   (ALLOCATE-DOTTED-FRAME arity) )
+;;;-------------------------------------------------------------
 
-(define (check-byte j)
-  (or (and (<= 0 j) (<= j 255))
-      (static-wrong "Cannot pack this number within a byte" j) ) )
 
-(define (SHALLOW-ARGUMENT-SET! j m)
-  (append m (SET-SHALLOW-ARGUMENT! j)) )
 
-(define (DEEP-ARGUMENT-SET! i j m)
-  (append m (SET-DEEP-ARGUMENT! i j)) )
+;;;------------------------utility-----------------------------------
+(define atom?
+  (lambda (v)
+    (not (pair? v))))
 
-(define (GLOBAL-SET! i m)
-  (append m (SET-GLOBAL! i)) )
+(define static-wrong 'wait)
 
-(define (SHALLOW-ARGUMENT-REF j)
-  (check-byte j)
-  (case j
-    ((0 1 2 3) (list (+ 1 j)))
-    (else      (list 5 j)) ) )
+;;; Determine the nature of a variable.
+;;; Three different answers. Or the variable is local (ie appears in R)
+;;; then return     (LOCAL index . depth)
+;;; global (ie created by the user) then return
+;;;                 (GLOBAL . index)
+;;; or predefined (and immutable) then return
+;;;                 (PREDEFINED . index)
+(define (compute-kind r n)
+  (or (local-variable? r 0 n)
+      (global-variable? g.current n)
+      (global-variable? g.init n) ) )
 
-(define (PREDEFINED i) (list 'PREDEFINED i))
-#|
-(define (PREDEFINED i)
-  (check-byte i)
-  (case i
-    ;; 0=\#t, 1=\#f, 2=(), 3=cons, 4=car, 5=cdr, 6=pair?, 7=symbol?, 8=eq?
-    ((0 1 2 3 4 5 6 7 8) (list (+ 10 i)))
-    (else                (list 19 i)) ) )
 
-(define (DEEP-ARGUMENT-REF i j) (list 6 i j))
-(define (SET-SHALLOW-ARGUMENT! j)
-  (case j
-    ((0 1 2 3) (list (+ 21 j)))
-    (else      (list 25 j)) ) )
-|#
-(define (DEEP-ARGUMENT-REF i j) (list 'DEEP-ARGUMENT-REF i j))
-(define (SET-SHALLOW-ARGUMENT! j) (list 'SET-SHALLOW-ARGUMENT! j))
-(define (SET-DEEP-ARGUMENT! i j) (list 'SET-DEEP-ARGUMENT! i j))
+(define (r-extend* r n*)
+  (cons n* r) )
 
-;(define (SET-DEEP-ARGUMENT! i j) (list 26 i j))
+(define (local-variable? r i n)
+  (and (pair? r)
+       (let scan ((names (car r))
+                  (j 0) )
+         (cond ((pair? names) 
+                (if (eq? n (car names))
+                    `(local ,i . ,j)
+                    (scan (cdr names) (+ 1 j)) ) )
+               ((null? names)
+                (local-variable? (cdr r) (+ i 1) n) )
+               ((eq? n names) `(local ,i . ,j)) ) ) ) )
 
-;(define (GLOBAL-REF i) (list 7 i))
+(define (g.current-extend! n)
+  (let ((level (length g.current)))
+    (set! g.current 
+          (cons (cons n `(global . ,level)) g.current) )
+    level ) )
 
-(define (CHECKED-GLOBAL-REF i) (list 8 i))
+(define (global-variable? g n)
+  (let ((var (assq n g)))
+    (and (pair? var)
+         (cdr var) ) ) )
 
-(define (SET-GLOBAL! i) (list 27 i))
+(define (global-fetch i)
+  (vector-ref sg.current i) )
 
-(define (CONSTANT value) (list 'CONSTANT value))
-#|
-(define (CONSTANT value)
-  (cond ((eq? value #t)    (list 10))
-        ((eq? value #f)    (list 11))
-        ((eq? value '())   (list 12))
-        ((equal? value -1) (list 80))
-        ((equal? value 0)  (list 81))
-        ((equal? value 1)  (list 82))
-        ((equal? value 2)  (list 83))
-        ((equal? value 4)  (list 84))
-        ((and (integer? value)  ; immediate value
-              (<= 0 value)
-              (< value 255) )
-         (list 79 value) )
-        (else (EXPLICIT-CONSTANT value)) ) )
-|#
-;;; All gotos have positive offsets (due to the generation)
+(define (global-update! i v)
+  (vector-set! sg.current i v) )
 
-(define (GOTO offset) (list 'GOTO offset))
-#|(define (GOTO offset)
-  (cond ((< offset 255) (list 30 offset))
-        ((< offset (+ 255 (* 255 256))) 
-         (let ((offset1 (modulo offset 256))
-               (offset2 (quotient offset 256)) )
-           (list 28 offset1 offset2) ) )
-        (else (static-wrong "too long jump" offset)) ) )
-|#
-(define (JUMP-FALSE offset) (list 'JMUP-FALSE offset))
-#|
-(define (JUMP-FALSE offset)
-  (cond ((< offset 255) (list 31 offset))
-        ((< offset (+ 255 (* 255 256))) 
-         (let ((offset1 (modulo offset 256))
-               (offset2 (quotient offset 256)) )
-           (list 29 offset1 offset2) ) )
-        (else (static-wrong "too long jump" offset)) ) )
-|#
+(define (g.current-initialize! name)
+  (let ((kind (compute-kind r.init name)))
+    (if kind
+        (case (car kind)
+          ((global)
+           (vector-set! sg.current (cdr kind) 'undefined-value) )
+          (else (static-wrong "Wrong redefinition" name)) )
+        (let ((index (g.current-extend! name)))
+          (vector-set! sg.current index 'undefined-value) ) ) )
+  name )
 
-;;(define (EXTEND-ENV) (list 32))
-;;(define (UNLINK-ENV) (list 33))
-(define (EXTEND-ENV) (list 'EXTEND-ENV))
-(define (UNLINK-ENV) (list 'UNLINK-ENV))
+(define (g.init-extend! n)
+  (let ((level (length g.init)))
+    (set! g.init
+          (cons (cons n `(predefined . ,level)) g.init) )
+    level ) )
 
-(define (INVOKE0 address)
-  (case address
-    ((read)    (list 89))
-    ((newline) (list 88))
-    (else (static-wrong "Cannot integrate" address)) ) )
+(define (g.init-initialize! name value)
+  (let ((kind (compute-kind r.init name)))
+    (if kind
+        (case (car kind)
+          ((predefined)
+           (vector-set! sg.init (cdr kind) value) )
+          (else (static-wrong "Wrong redefinition" name)) )
+        (let ((index (g.init-extend! name)))
+          (vector-set! sg.init index value) ) ) )
+  name )
 
-(define (INVOKE1 address)
-  (case address
-    ((car)     (list 90))
-    ((cdr)     (list 91))
-    ((pair?)   (list 92))
-    ((symbol?) (list 93))
-    ((display) (list 94))
-    (else (static-wrong "Cannot integrate" address)) ) )
-
-;;; The same one with other unary primitives.
-#|
-(define (INVOKE1 address)
-  (case address
-    ((car)     (list 90))
-    ((cdr)     (list 91))
-    ((pair?)   (list 92))
-    ((symbol?) (list 93))
-    ((display) (list 94))
-    ((primitive?) (list 95))
-    ((null?)   (list 96))
-    ((continuation?) (list 97))
-    ((eof-object?)   (list 98))
-    (else (static-wrong "Cannot integrate" address)) ) )
-|#
-
-(define (ALTERNATIVE m1 m2 m3)
-  (let ((mm2 (append m2 (GOTO (length m3)))))
-    (append m1 (JUMP-FALSE (length mm2)) mm2 m3) ) )
-
-;;(define (PUSH-VALUE) (list 34)) 
-;;(define (POP-ARG1) (list 35))
-(define (PUSH-VALUE) (list 'PUSH-VALUE)) 
-(define (POP-ARG1) (list 'POP-ARG1))
-
-#|
-(define (INVOKE2 address)
-  (case address
-    ((cons)     (list 100))
-    ((eq?)      (list 101))
-    ((set-car!) (list 102))
-    ((set-cdr!) (list 103))
-    ((+)        (list 104))
-    ((-)        (list 105))
-    ((=)        (list 106))
-    ((<)        (list 107))
-    ((>)        (list 108))
-    ((*)        (list 109))
-    ((<=)       (list 110))
-    ((>=)       (list 111))
-    ((remainder)(list 112))
-    (else (static-wrong "Cannot integrate" address)) ) )
-|#
-
-(define (INVOKE2 address)
-  (case address
-    ((cons)     (list 'CONS))
-    ((eq?)      (list 'EQ?))
-    ((set-car!) (list 'SET-CAR!))
-    ((set-cdr!) (list 'SET-CDR!))
-    ((+)        (list 'ADD))
-    ((-)        (list 'SUB))
-    ((=)        (list 'EQUAL))
-    ((<)        (list '<))
-    ((>)        (list '>))
-    ((*)        (list '*))
-    ((<=)       (list '<=))
-    ((>=)       (list '>=))
-    ((remainder)(list 'REMAINDER))
-    (else (static-wrong "Cannot integrate" address)) ) )
-
-(define (POP-ARG2) (list 36))
-
-(define (INVOKE3 address)
-  (static-wrong "No ternary integrated procedure" address) )
-
-(define (CREATE-CLOSURE offset) (list 'CREATE-CLOSURE offset))
-;;(define (CREATE-CLOSURE offset) (list 40 offset))
-
-(define (ARITY=? arity+1) (list 'ARITY=? arity+1))
-
-#|
-(define (ARITY=? arity+1)
-  (case arity+1
-    ((1 2 3 4) (list (+ 70 arity+1)))
-    (else        (list 75 arity+1)) ) )
-|#
-;;(define (RETURN) (list 43))
-(define (RETURN) (list 'RETURN))
-
-(define (PACK-FRAME! arity) (list 44 arity))
-
-(define (ARITY>=? arity+1) (list 78 arity+1))
-
-;(define (FUNCTION-GOTO) (list 46))
-(define (FUNCTION-GOTO) (list 'FUNCTION-GOTO))
-;(define (POP-FUNCTION) (list 39))
-(define (POP-FUNCTION) (list 'POP-FUNCTION))
-
-(define (FUNCTION-INVOKE) (list 45))
-
-(define (PRESERVE-ENV) (list 37))
-
-(define (RESTORE-ENV) (list 38))
-
-#|
-(define (POP-FRAME! rank)
-  (case rank
-    ((0 1 2 3) (list (+ 60 rank)))
-    (else      (list 64 rank)) ) )
-|#
-(define (POP-FRAME! rank)
-  (list 'POP-FRAME! rank))
-
-(define (POP-CONS-FRAME! arity) (list 47 arity))
-
-#|
-(define (ALLOCATE-FRAME size)
-  (case size
-    ((0 1 2 3 4) (list (+ 50 size)))
-    (else        (list 55 (+ size 1))) ) )
-|#
-(define (ALLOCATE-FRAME size) (list 'ALLOCATE-FRAME size))
-
-(define (ALLOCATE-DOTTED-FRAME arity) (list 56 (+ arity 1)))
-
-;(define (FINISH) (list 20))
-(define (FINISH) (list 'FINISH))
-
-;;;ooooooooooooooooooooooooooooooooooooo
 (define-syntax definitial
   (syntax-rules ()
     ((definitial name value)
      (g.init-initialize! 'name value) ) ) )
-(definitial t #t)
-(definitial f #f)
-(definitial nil '())
 
 (define-syntax defprimitive
   (syntax-rules ()
@@ -590,27 +314,6 @@
          (description-extend! 'name `(function value))
          (lambda (v) name))))))
 
-;;;oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
-;;; Describe a predefined value.
-;;; The description language only represents primitives with their arity:
-;;;          (FUNCTION address . variables-list)
-;;; with variables-list := () | (a) | (a b) | (a b c)
-;;; Only the structure of the VARIABLES-LIST is interesting (not the
-;;; names of the variables). ADDRESS is the address of the primitive
-;;; to use when inlining an invokation to it. This address is
-;;; represented by a Scheme procedure.
-
-(define desc.init '())
-
-(define (get-description name)
-  (let ((p (assq name desc.init)))
-    (and (pair? p) (cdr p)) ) )
-
-(define (description-extend! name description)
-  (set! desc.init 
-        (cons (cons name description) desc.init) )
-  name )
-
 (define-syntax defprimitive1
   (syntax-rules ()
     ((defprimitive1 name value)
@@ -627,6 +330,39 @@
          (description-extend! 'name `(function value a b))
          (lambda (v) name))))))
 
+(define (get-description name)
+  (let ((p (assq name desc.init)))
+    (and (pair? p) (cdr p)) ) )
+
+(define (description-extend! name description)
+  (set! desc.init 
+        (cons (cons name description) desc.init) )
+  name )
+;;;---------------------------------------------------
+
+
+
+;;;--------------------initialize--------------------------
+(define r.init '())
+(define sg.current (make-vector 100))
+(define g.current '())
+(define g.init '())
+(define sg.init (make-vector 100))
+(define desc.init '())
+
+(definitial t #t)
+(definitial f #f)
+(definitial nil '())
+
+;;;oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+;;; Describe a predefined value.
+;;; The description language only represents primitives with their arity:
+;;;          (FUNCTION address . variables-list)
+;;; with variables-list := () | (a) | (a b) | (a b c)
+;;; Only the structure of the VARIABLES-LIST is interesting (not the
+;;; names of the variables). ADDRESS is the address of the primitive
+;;; to use when inlining an invokation to it. This address is
+;;; represented by a Scheme procedure.
 (defprimitive cons cons 2)
 (defprimitive car car 1)
 (defprimitive cdr cdr 1)
@@ -651,3 +387,245 @@
 (defprimitive null? null? 1)
 (defprimitive newline newline 0)
 (defprimitive eof-object? eof-object? 1)
+;;;------------------------------------------------
+
+
+
+;;;----------------------assemble---------------------
+(define (SEQUENCE m m+)
+  (append m m+) )
+(define (FIX-CLOSURE m+ arity)
+  (let* ((the-function (append (ARITY=? (+ arity 1)) (EXTEND-ENV)
+                               m+  (RETURN) ))
+         (the-goto (GOTO (length the-function))) )
+    (append (CREATE-CLOSURE (length the-goto)) the-goto the-function) ) )
+(define NARY-CLOSURE 'wait)
+(define (TR-FIX-LET m* m+)
+  (append m* (EXTEND-ENV) m+) )
+(define (FIX-LET m* m+)
+  (append m* (EXTEND-ENV) m+ (UNLINK-ENV)) )
+(define (CALL0 address)
+  (INVOKE0 address) )
+(define (CALL1 address m1)
+  (append m1 (INVOKE1 address) ) )
+(define (CALL2 address m1 m2)
+  (append m1 (PUSH-VALUE) m2 (POP-ARG1) (INVOKE2 address)) )
+(define (CALL3 address m1 m2 m3)
+  (append m1 (PUSH-VALUE) 
+          m2 (PUSH-VALUE) 
+          m3 (POP-ARG2) (POP-ARG1) (INVOKE3 address) ) )
+(define (TR-REGULAR-CALL m m*)
+  (append m (PUSH-VALUE) m* (POP-FUNCTION) (FUNCTION-GOTO)) )
+(define (REGULAR-CALL m m*)
+  (append m (PUSH-VALUE) m* (POP-FUNCTION) 
+          (PRESERVE-ENV) (FUNCTION-INVOKE) (RESTORE-ENV) ) )
+(define (FUNCTION-INVOKE) (list 'FUNCTION-INVOKE))
+(define (STORE-ARGUMENT m m* rank)
+  (append m (PUSH-VALUE) m* (POP-FRAME! rank)) )
+(define CONS-ARGUMENT 'wait)
+(define EXPLICIT-CONSTANT 'wait)
+(define (SHALLOW-ARGUMENT-SET! j m)
+  (append m (SET-SHALLOW-ARGUMENT! j)) )
+(define (DEEP-ARGUMENT-SET! i j m)
+  (append m (SET-DEEP-ARGUMENT! i j)) )
+(define (GLOBAL-SET! i m)
+  (append m (SET-GLOBAL! i)) )
+(define (SHALLOW-ARGUMENT-REF j)
+  (list 'SHALLOW-ARGUMENT-REF j))
+(define (PREDEFINED i) (list 'PREDEFINED i))
+(define (DEEP-ARGUMENT-REF i j) (list 'DEEP-ARGUMENT-REF i j))
+(define (SET-SHALLOW-ARGUMENT! j) (list 'SET-SHALLOW-ARGUMENT! j))
+(define (SET-DEEP-ARGUMENT! i j) (list 'SET-DEEP-ARGUMENT! i j))
+(define (CHECKED-GLOBAL-REF i) (list 'CHECKED-GLOBAL-REF i))
+(define (SET-GLOBAL! i) (list 'SET-GLOBAL! i))
+(define (CONSTANT value) (list 'CONSTANT value))
+(define (GOTO offset) (list 'GOTO offset))
+(define (JUMP-FALSE offset) (list 'JMUP-FALSE offset))
+(define (EXTEND-ENV) (list 'EXTEND-ENV))
+(define (UNLINK-ENV) (list 'UNLINK-ENV))
+(define (ALTERNATIVE m1 m2 m3)
+  (let ((mm2 (append m2 (GOTO (length m3)))))
+    (append m1 (JUMP-FALSE (length mm2)) mm2 m3) ) )
+(define (PUSH-VALUE) (list 'PUSH-VALUE)) 
+(define (PRESERVE-ENV) (list 'PRESERVE-ENV))
+(define (RESTORE-ENV) (list 'RESTORE-ENV))
+(define (POP-ARG1) (list 'POP-ARG1))
+(define (POP-ARG2) (list 'POP-ARG2))
+(define (INVOKE0 address)
+  (case address
+    ((read)    (list 'READ))
+    ((newline) (list 'NEWLINE))
+    (else (static-wrong "Cannot integrate" address)) ) )
+(define (INVOKE1 address)
+  (case address
+    ((car)     (list 'CAR))
+    ((cdr)     (list 'CDR))
+    ((pair?)   (list 'PAIR?))
+    ((symbol?) (list 'SYMBOL?))
+    ((display) (list 'DISPLAY))
+    ((primitive?) (list 'PRIMITIVE?))
+    ((null?)   (list 'NULL?))
+    ((continuation?) (list 'CONTINUATION?))
+    ((eof-object?)   (list 'EOF-OBJECT?))
+    (else (static-wrong "Cannot integrate" address)) ) )
+(define (INVOKE2 address)
+  (case address
+    ((cons)     (list 'CONS))
+    ((eq?)      (list 'EQ?))
+    ((set-car!) (list 'SET-CAR!))
+    ((set-cdr!) (list 'SET-CDR!))
+    ((+)        (list 'ADD))
+    ((-)        (list 'SUB))
+    ((=)        (list 'EQUAL))
+    ((<)        (list '<))
+    ((>)        (list '>))
+    ((*)        (list '*))
+    ((<=)       (list '<=))
+    ((>=)       (list '>=))
+    ((remainder)(list 'REMAINDER))
+    (else (static-wrong "Cannot integrate" address)) ) )
+(define (INVOKE3 address)
+  (static-wrong "No ternary integrated procedure" address) )
+(define (CREATE-CLOSURE offset) (list 'CREATE-CLOSURE offset))
+(define (ARITY=? arity+1) (list 'ARITY=? arity+1))
+(define (RETURN) (list 'RETURN))
+(define (FUNCTION-GOTO) (list 'FUNCTION-GOTO))
+(define (POP-FUNCTION) (list 'POP-FUNCTION))
+(define (POP-FRAME! rank)
+  (list 'POP-FRAME! rank))
+(define (ALLOCATE-FRAME size) (list 'ALLOCATE-FRAME size))
+(define (ALLOCATE-DOTTED-FRAME arity) (list 'ALLOCATE-DOTTED-FRAME (+ arity 1)))
+(define (FINISH) (list 'FINISH))
+;;;---------------------------------------------------
+
+
+
+;;;-------------------opcode--------------------------
+#|
+(define (check-byte j)
+  (or (and (<= 0 j) (<= j 255))
+      (static-wrong "Cannot pack this number within a byte" j) ) )
+(define (CHECKED-GLOBAL-REF i) (list 8 i))
+(define (SHALLOW-ARGUMENT-REF j)
+  (check-byte j)
+  (case j
+    ((0 1 2 3) (list (+ 1 j)))
+    (else      (list 5 j)) ) )
+(define (SET-GLOBAL! i) (list 27 i))
+(define (ALLOCATE-DOTTED-FRAME arity) (list 56 (+ arity 1)))
+(define (PREDEFINED i)
+  (check-byte i)
+  (case i
+    ;; 0=\#t, 1=\#f, 2=(), 3=cons, 4=car, 5=cdr, 6=pair?, 7=symbol?, 8=eq?
+    ((0 1 2 3 4 5 6 7 8) (list (+ 10 i)))
+    (else                (list 19 i)) ) )
+
+(define (DEEP-ARGUMENT-REF i j) (list 6 i j))
+(define (SET-SHALLOW-ARGUMENT! j)
+  (case j
+    ((0 1 2 3) (list (+ 21 j)))
+    (else      (list 25 j)) ) )
+(define (SET-DEEP-ARGUMENT! i j) (list 26 i j))
+(define (GLOBAL-REF i) (list 7 i))
+(define (GOTO offset)
+  (cond ((< offset 255) (list 30 offset))
+        ((< offset (+ 255 (* 255 256))) 
+         (let ((offset1 (modulo offset 256))
+               (offset2 (quotient offset 256)) )
+           (list 28 offset1 offset2) ) )
+        (else (static-wrong "too long jump" offset)) ) )
+(define (CONSTANT value)
+  (cond ((eq? value #t)    (list 10))
+        ((eq? value #f)    (list 11))
+        ((eq? value '())   (list 12))
+        ((equal? value -1) (list 80))
+        ((equal? value 0)  (list 81))
+        ((equal? value 1)  (list 82))
+        ((equal? value 2)  (list 83))
+        ((equal? value 4)  (list 84))
+        ((and (integer? value)  ; immediate value
+              (<= 0 value)
+              (< value 255) )
+         (list 79 value) )
+        (else (EXPLICIT-CONSTANT value)) ) )
+
+;;; All gotos have positive offsets (due to the generation)
+(define (JUMP-FALSE offset)
+  (cond ((< offset 255) (list 31 offset))
+        ((< offset (+ 255 (* 255 256))) 
+         (let ((offset1 (modulo offset 256))
+               (offset2 (quotient offset 256)) )
+           (list 29 offset1 offset2) ) )
+        (else (static-wrong "too long jump" offset)) ) )
+(define (CREATE-CLOSURE offset) (list 40 offset))
+
+;;; The same one with other unary primitives.
+(define (EXTEND-ENV) (list 32))
+(define (UNLINK-ENV) (list 33))
+(define (INVOKE0 address)
+  (case address
+    ((read)    (list 89))
+    ((newline) (list 88))
+    (else (static-wrong "Cannot integrate" address)) ) )
+
+(define (INVOKE1 address)
+  (case address
+    ((car)     (list 90))
+    ((cdr)     (list 91))
+    ((pair?)   (list 92))
+    ((symbol?) (list 93))
+    ((display) (list 94))
+    ((primitive?) (list 95))
+    ((null?)   (list 96))
+    ((continuation?) (list 97))
+    ((eof-object?)   (list 98))
+    (else (static-wrong "Cannot integrate" address)) ) )
+
+(define (POP-CONS-FRAME! arity) (list 47 arity))
+(define (PACK-FRAME! arity) (list 44 arity))
+
+(define (ARITY>=? arity+1) (list 78 arity+1))
+
+(define (PUSH-VALUE) (list 34)) 
+(define (POP-ARG1) (list 35))
+(define (INVOKE2 address)
+  (case address
+    ((cons)     (list 100))
+    ((eq?)      (list 101))
+    ((set-car!) (list 102))
+    ((set-cdr!) (list 103))
+    ((+)        (list 104))
+    ((-)        (list 105))
+    ((=)        (list 106))
+    ((<)        (list 107))
+    ((>)        (list 108))
+    ((*)        (list 109))
+    ((<=)       (list 110))
+    ((>=)       (list 111))
+    ((remainder)(list 112))
+    (else (static-wrong "Cannot integrate" address)) ) )
+
+(define (POP-ARG2) (list 36))
+(define (FUNCTION-INVOKE) (list 45))
+
+(define (PRESERVE-ENV) (list 37))
+
+(define (RESTORE-ENV) (list 38))
+(define (ARITY=? arity+1)
+  (case arity+1
+    ((1 2 3 4) (list (+ 70 arity+1)))
+    (else        (list 75 arity+1)) ) )
+
+(define (RETURN) (list 43))
+(define (FUNCTION-GOTO) (list 46))
+(define (POP-FUNCTION) (list 39))
+(define (POP-FRAME! rank)
+  (case rank
+    ((0 1 2 3) (list (+ 60 rank)))
+    (else      (list 64 rank)) ) )
+(define (FINISH) (list 20))
+(define (ALLOCATE-FRAME size)
+  (case size
+    ((0 1 2 3 4) (list (+ 50 size)))
+    (else        (list 55 (+ size 1))) ) )
+|#
