@@ -378,6 +378,10 @@ struct sexp_struct {
       sexp renames;
 #endif
     } env;
+	struct {
+		sexp env;
+		int pc;
+	} closure;
     struct {
       sexp_uint_t length, max_depth;
       sexp name, literals, source;
