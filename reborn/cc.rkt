@@ -311,7 +311,7 @@
     ((defprimitive0 name value)
      (definitial name
        (begin
-         (description-extend! 'name `(function value))
+         (description-extend! 'name `(function ,value))
          (lambda (v) name))))))
 
 (define-syntax defprimitive1
@@ -319,7 +319,7 @@
     ((defprimitive1 name value)
      (definitial name
        (begin
-         (description-extend! 'name `(function value a))
+         (description-extend! 'name `(function ,value a))
          (lambda (v) name))))))
 
 (define-syntax defprimitive2
@@ -327,7 +327,7 @@
     ((defprimitive2 name value)
      (definitial name
        (begin
-         (description-extend! 'name `(function value a b))
+         (description-extend! 'name `(function ,value a b))
          (lambda (v) name))))))
 
 (define (get-description name)
@@ -566,7 +566,7 @@
                 ((equal? value 2)  (list 83))
                 ((equal? value 4)  (list 84))
                 ((and (integer? value)  ; immediate value
-                      (<= 0 value)
+                      (>= 0 value)
                       (< value 255) )
                  (list 79 value) )
                 (else (EXPLICIT-CONSTANT value)))))  
@@ -645,7 +645,7 @@
 ;;;---------------interpret provider-------------
 (define *val* 'wait)
 (define *env* '())
-(define *pc* 0)
+(define *pc* '())
 (define *stack* (make-vector 100))
 (define *stack-index* 0)
 (define *arg1* 'wait)
@@ -658,7 +658,7 @@
   (vector-ref (car sr) i))
 (define activation-frame-next cdr)
 (define (set-activation-frame-argument! sr j v)
-  (vector-set! (car sr) j v))
+  (vector-set! sr j v))
 (define (activation-frame-argument-length v*)
   (vector-length v*))
 (define allocate-activation-frame make-vector)
