@@ -47,6 +47,9 @@ sexp_make_closure(int pc, sexp env) {
   return proc;
 }
 
+#define sexp_closure_env(x) (sexp_field(x, closure, SEXP_PROCEDURE, env))
+#define sexp_closure_pc(x) (sexp_field(x, closure, SEXP_PROCEDURE, pc))
+
 static int
 CONSTANT(struct vm *vm) {
 	int ret = 1;
@@ -73,7 +76,7 @@ CONSTANT(struct vm *vm) {
 			vm->val = sexp_make_fixnum(2);
 			break;
 		case 84:
-			vm->val = sexp_make_fixnum(4);
+			vm->val = sexp_make_fixnum(3);
 			break;
 		case 79:
 		 	vm->val = sexp_make_fixnum(vm->code[vm->pc+1]);
@@ -97,10 +100,11 @@ PUSH_VALUE(struct vm *vm) {
 	return 1;
 }
 
-static void
+static int
 POP_FUNCTION(struct vm *vm) {
 	vm->idx--;
 	vm->fun = vm->stack[vm->idx];
+	return 1;
 }
 
 static void
@@ -115,14 +119,6 @@ RESTORE_ENV(struct vm *vm) {
 	vm->env = vm->stack[vm->idx];
 }
 
-static void
-JUMP_FALSE(struct vm *vm) {
-	if (sexp_not(vm->val)) {
-		vm->pc++;
-		vm->pc = vm->code[vm->pc];
-	}
-}
-
 static int
 FINISH(struct vm *vm) {
 	return 0;
@@ -135,18 +131,22 @@ CREATE_CLOSURE(struct vm *vm) {
 	return 2;
 }
 
-/*
-static void
+static int
 FUNCTION_INVOKE(struct vm *vm) {
 	sexp closure = vm->fun;
 
-	vm->stack[vm->idx] = vm->pc;
-	vm->idx++;
-
-	vm->env = sexp_closure_env(closure);
-	vm->pc = sexp_closure_pc(closure);
+	if (sexp_procedurep(closure)) {
+		sexp pc = sexp_make_fixnum(vm->pc);
+		vm->stack[vm->idx] = pc;
+		vm->idx++;
+		
+		vm->env = sexp_closure_env(closure);
+		vm->pc = sexp_closure_pc(closure);
+	} else {
+		return -1;
+	}
+	return 1;
 }
-*/
 
 static int
 INVOKE1(struct vm *vm) {
@@ -233,10 +233,11 @@ INVOKE2(struct vm *vm) {
 	return 1;
 }
 
-static void
+static int
 RETURN(struct vm *vm) {
-	vm->pc--;
-	vm->val = vm->stack[vm->idx];
+	vm->idx--;
+	vm->pc = sexp_unbox_fixnum(vm->stack[vm->idx]);
+	return 1;
 }
 
 static int
@@ -312,46 +313,25 @@ GOTO(struct vm *vm) {
 	return -1;
 }
 
-static void
-SHORT_JUMP_FALSE(struct vm *vm) {
-	if (sexp_not(vm->val)) {
-		int offset = vm->code[vm->pc];
-		vm->pc = vm->pc + offset;
+static int
+JUMP_FALSE(struct vm *vm) {
+	int op = vm->code[vm->pc];
+	
+	if (op == 31) {
+		if (sexp_not(vm->val)) {
+			int offset = vm->code[vm->pc+1];
+			vm->pc += offset;
+		}
+		return 2;
+	} else if (op == 29) {
+		if (sexp_not(vm->val)) {
+			int offset1 = vm->code[vm->pc+1];
+			int offset2 = vm->code[vm->pc+2];
+			vm->pc += (offset1 + offset2 * 256);
+		}
+		return 3;
 	}
-}
-
-static void
-LONG_GOTO(struct vm *vm) {
-	int offset1;
-	int offset2;
-	int offset;
-
-	offset1 = vm->code[vm->pc];
-	vm->pc++;
-	offset2 = vm->code[vm->pc];
-	vm->pc++;
-	offset = offset1 + offset2 * 256;
-	vm->pc = vm->pc + offset;
-}
-
-static void
-ALLOCATE_FRAME0(struct vm *vm) {
-	vm->val = allocate_activation_frame(0);
-}
-
-static void
-ALLOCATE_FRAME1(struct vm *vm) {
-	vm->val = allocate_activation_frame(1);
-}
-
-static void
-ALLOCATE_FRAME2(struct vm *vm) {
-	vm->val = allocate_activation_frame(2);
-}
-
-static void
-ALLOCATE_FRAME3(struct vm *vm) {
-	vm->val = allocate_activation_frame(3);
+	return -1;
 }
 
 static int
@@ -457,8 +437,9 @@ initialize() {
 
 	instructions[20] = FINISH;
 	instructions[28] = GOTO;
+	instructions[29] = JUMP_FALSE;
 	instructions[30] = GOTO;
-	// instructions[31] = SHORT_JUMP_FALSE;
+	instructions[31] = JUMP_FALSE;
 	instructions[32] = EXTEND_ENV;
 	// instructions[33] = UNLINK_ENV;
 	instructions[34] = PUSH_VALUE;
@@ -466,10 +447,10 @@ initialize() {
 	// instructions[36] = POP_ARG2;
 	// instructions[37] = PRESERVE_ENV;
 	// instructions[38] = RESTORE_ENV;
-	// instructions[39] = POP_FUNCTION;
+	instructions[39] = POP_FUNCTION;
 	instructions[40] = CREATE_CLOSURE;
-	// instructions[43] = RETURN;
-	// instructions[45] = FUNCTION_INVOKE;
+	instructions[43] = RETURN;
+	instructions[45] = FUNCTION_INVOKE;
 	// instructions[46] = FUNCTION_GOTO;
 
 	instructions[50] = ALLOCATE_FRAME;
@@ -560,7 +541,9 @@ int
 main(int argc, char *argv[]) {
 	struct vm vm;
 	// char bytecode[] = {82, 34, 83, 34, 52, 61, 60, 32, 1, 34, 2, 35, 104, 20};
-	char bytecode[] = {40, 2, 30, 8, 72, 32, 1, 34, 82, 35, 104, 43, 20};
+	// char bytecode[] = {40, 2, 30, 8, 72, 32, 1, 34, 82, 35, 104, 43, 20};
+	// char bytecode[] = {10, 31, 3, 82, 30, 1, 83, 20};
+	char bytecode[] = {40, 2, 30, 4, 72, 32, 1, 43, 34, 51, 60, 32, 1, 34, 84, 34, 51, 60, 39, 45, 20};
 	int succ;
 	
 	initialize();
