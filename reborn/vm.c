@@ -3,15 +3,17 @@
 struct vm {
 	sexp stack[1000];
 	int idx;
-
-	char *code;
-	int pc;
-
+	
 	sexp env;
 	sexp val;
 	sexp fun;
 	sexp arg1;
 	sexp arg2;
+
+	char *code;
+	int pc;	
+
+	sexp global;
 };
 
 sexp
@@ -88,11 +90,6 @@ CONSTANT(struct vm *vm) {
 	return ret;
 }
 
-static void
-GLOBAL_SET(struct vm *vm) {
-
-}
-
 static int
 PUSH_VALUE(struct vm *vm) {
 	vm->stack[vm->idx] = vm->val;
@@ -107,6 +104,7 @@ POP_FUNCTION(struct vm *vm) {
 	return 1;
 }
 
+/*
 static void
 PRESERVE_ENV(struct vm *vm) {
 	vm->idx--;
@@ -118,6 +116,7 @@ RESTORE_ENV(struct vm *vm) {
 	vm->idx--;
 	vm->env = vm->stack[vm->idx];
 }
+*/
 
 static int
 FINISH(struct vm *vm) {
@@ -273,13 +272,9 @@ static void
 SET_DEEP_ARGUMENT(struct vm *vm) {
 	deep_update(vm->env, i, j, vm->val);
 }
+*/
 
-static void
-GLOBAL_REF(struct vm *vm) {
-	int i = vm->code[vm->pc];
-	vm->val = global_fetch(i);
-}
-
+/*
 static void
 CHECKED_GLOBAL_REF(struct vm *vm) {
 	int i = vm->code[vm->pc];
@@ -288,13 +283,22 @@ CHECKED_GLOBAL_REF(struct vm *vm) {
 		printf("Uninitialized global variable");
 	}
 }
-
-static void
-SET_GLOBAL(struct vm *vm) {
-	int i = vm->code[vm->pc];
-	global_update(i, vm->val);
-}
 */
+
+static int
+GLOBAL_REF(struct vm *vm) {
+	int i = vm->code[vm->pc + 1];
+	vm->val = sexp_vector_data(vm->global)[i];
+	return 2;
+}
+
+static int
+SET_GLOBAL(struct vm *vm) {
+	int i = vm->code[vm->pc + 1];
+	sexp_vector_data(vm->global)[i] = vm->val;
+	vm->val = SEXP_VOID;
+	return 2;
+}
 
 static int
 GOTO(struct vm *vm) {
@@ -366,16 +370,6 @@ POP_FRAME(struct vm *vm) {
 	return -1;
 }
 
-static void
-CALL1_CAR(struct vm *vm) {
-	vm->val = sexp_car(vm->val);
-}
-
-static void
-CALL1_CDR(struct vm *vm) {
-	vm->val = sexp_cdr(vm->val);
-}
-
 static int
 EXTEND_ENV(struct vm *vm) {
 	vm->env = sr_extend(vm->env, vm->val);
@@ -431,11 +425,13 @@ initialize() {
 	instructions[4] = SHALLOW_ARGUMENT_REF;
 	instructions[5] = SHALLOW_ARGUMENT_REF;
 
+	instructions[7] = GLOBAL_REF;
 	instructions[10] = CONSTANT;
 	instructions[11] = CONSTANT;
 	instructions[12] = CONSTANT;
 
 	instructions[20] = FINISH;
+	instructions[27] = SET_GLOBAL;
 	instructions[28] = GOTO;
 	instructions[29] = JUMP_FALSE;
 	instructions[30] = GOTO;
@@ -505,11 +501,13 @@ initialize() {
 }
 
 int
-run(struct vm *vm, char *code) {
+run(struct vm *vm, char *code, sexp global) {
 	int offset;
 	int op;
 	
 	vm->code = code;
+	vm->global = global;
+	
 	for ( ; ;) {
 		op = code[vm->pc];
 		offset = instructions[op](vm);
@@ -543,12 +541,16 @@ main(int argc, char *argv[]) {
 	// char bytecode[] = {82, 34, 83, 34, 52, 61, 60, 32, 1, 34, 2, 35, 104, 20};
 	// char bytecode[] = {40, 2, 30, 8, 72, 32, 1, 34, 82, 35, 104, 43, 20};
 	// char bytecode[] = {10, 31, 3, 82, 30, 1, 83, 20};
-	char bytecode[] = {40, 2, 30, 4, 72, 32, 1, 43, 34, 51, 60, 32, 1, 34, 84, 34, 51, 60, 39, 45, 20};
+	// char bytecode[] = {40, 2, 30, 4, 72, 32, 1, 43, 34, 51, 60, 32, 1, 34, 84, 34, 51, 60, 39, 45, 20};
+	// char bytecode[] = {79, 6, 27, 0, 20};
+	char bytecode[] = {8, 0, 20};
 	int succ;
+	sexp global;
 	
+	global = sexp_make_vector(NULL, SEXP_ONE, SEXP_ONE);
 	initialize();
 	vm_init(&vm);
-	succ = run(&vm, bytecode);
+	succ = run(&vm, bytecode, global);
 	printf("%ld", sexp_unbox_fixnum(vm.val));
 	return 0;
 }

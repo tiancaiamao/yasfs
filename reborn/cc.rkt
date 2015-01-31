@@ -311,7 +311,7 @@
     ((defprimitive0 name value)
      (definitial name
        (begin
-         (description-extend! 'name `(function value))
+         (description-extend! 'name `(function ,value))
          (lambda (v) name))))))
 
 (define-syntax defprimitive1
@@ -319,7 +319,7 @@
     ((defprimitive1 name value)
      (definitial name
        (begin
-         (description-extend! 'name `(function value a))
+         (description-extend! 'name `(function ,value a))
          (lambda (v) name))))))
 
 (define-syntax defprimitive2
@@ -327,7 +327,7 @@
     ((defprimitive2 name value)
      (definitial name
        (begin
-         (description-extend! 'name `(function value a b))
+         (description-extend! 'name `(function ,value a b))
          (lambda (v) name))))))
 
 (define (get-description name)
@@ -566,7 +566,7 @@
                 ((equal? value 2)  (list 83))
                 ((equal? value 3)  (list 84))
                 ((and (integer? value)  ; immediate value
-                      (>= 0 value)
+                      (>= value 0)
                       (< value 255) )
                  (list 79 value) )
                 (else (EXPLICIT-CONSTANT value)))))  
