@@ -311,7 +311,7 @@
     ((defprimitive0 name value)
      (definitial name
        (begin
-         (description-extend! 'name `(function ,value))
+         (description-extend! 'name `(function value))
          (lambda (v) name))))))
 
 (define-syntax defprimitive1
@@ -319,7 +319,7 @@
     ((defprimitive1 name value)
      (definitial name
        (begin
-         (description-extend! 'name `(function ,value a))
+         (description-extend! 'name `(function value a))
          (lambda (v) name))))))
 
 (define-syntax defprimitive2
@@ -327,7 +327,7 @@
     ((defprimitive2 name value)
      (definitial name
        (begin
-         (description-extend! 'name `(function ,value a b))
+         (description-extend! 'name `(function value a b))
          (lambda (v) name))))))
 
 (define (get-description name)
@@ -531,7 +531,7 @@
         (lambda (address)
           (static-wrong "No ternary integrated procedure" address)))
   (set! ALLOCATE-DOTTED-FRAME (lambda (arity) (list 56 (+ arity 1))))
-  (set! NARY-CLOSURE 'wait)
+
   (set! PREDEFINED
         (lambda (i)
           (check-byte i)

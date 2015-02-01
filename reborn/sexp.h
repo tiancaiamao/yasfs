@@ -382,6 +382,10 @@ struct sexp_struct {
 		sexp env;
 		int pc;
 	} closure;
+	struct {
+		int code;
+		int code1;
+	} primitive;
     struct {
       sexp_uint_t length, max_depth;
       sexp name, literals, source;

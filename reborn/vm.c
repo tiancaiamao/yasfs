@@ -17,6 +17,28 @@ struct vm {
 };
 
 sexp
+deep_fetch(sexp env, int i, int j) {
+	sexp tmp = env;
+	
+	while (i > 0) {
+		tmp = sexp_cdr(tmp);
+		i--;
+	}
+	return sexp_vector_data(sexp_car(tmp))[j];
+}
+
+void
+deep_update(sexp env, int i, int j, sexp val) {
+	sexp tmp = env;
+	
+	while (i > 0) {
+		tmp = sexp_cdr(tmp);
+		i--;
+	}
+	sexp_vector_data(sexp_car(tmp))[j] = val;
+}
+
+sexp
 sr_extend(sexp env, sexp vals) {
 	return sexp_cons(NULL, vals, env);
 }
@@ -43,7 +65,7 @@ set_activation_frame_argument(sexp sr, int i, sexp val) {
 
 sexp 
 sexp_make_closure(int pc, sexp env) {
-  sexp proc = sexp_alloc_type(NULL, pair, SEXP_PROCEDURE);
+  sexp proc = sexp_alloc_type(NULL, closure, SEXP_PROCEDURE);
   sexp_field(proc, closure, SEXP_PROCEDURE, pc) = pc;
   sexp_field(proc, closure, SEXP_PROCEDURE, env) = env;
   return proc;
@@ -51,6 +73,17 @@ sexp_make_closure(int pc, sexp env) {
 
 #define sexp_closure_env(x) (sexp_field(x, closure, SEXP_PROCEDURE, env))
 #define sexp_closure_pc(x) (sexp_field(x, closure, SEXP_PROCEDURE, pc))
+
+sexp 
+sexp_make_primitive(int code, int code1) {
+	sexp prim = sexp_alloc_type(NULL, primitive, SEXP_OPCODE);
+	sexp_field(prim, primitive, SEXP_OPCODE, code) = code;
+	sexp_field(prim, primitive, SEXP_OPCODE, code1) = code1;
+	return prim;
+}
+
+#define sexp_primitive_code(x) (sexp_field(x, primitive, SEXP_OPCODE, code))
+#define sexp_primitive_code1(x) (sexp_field(x, primitive, SEXP_OPCODE, code1))
 
 static int
 CONSTANT(struct vm *vm) {
@@ -104,19 +137,19 @@ POP_FUNCTION(struct vm *vm) {
 	return 1;
 }
 
-/*
-static void
+static int
 PRESERVE_ENV(struct vm *vm) {
-	vm->idx--;
-	vm->env = vm->stack[vm->idx];
+	vm->stack[vm->idx] = vm->env;
+	vm->idx++;
+	return 1;
 }
 
-static void
+static int
 RESTORE_ENV(struct vm *vm) {
 	vm->idx--;
 	vm->env = vm->stack[vm->idx];
+	return 1;
 }
-*/
 
 static int
 FINISH(struct vm *vm) {
@@ -132,17 +165,50 @@ CREATE_CLOSURE(struct vm *vm) {
 
 static int
 FUNCTION_INVOKE(struct vm *vm) {
-	sexp closure = vm->fun;
+	sexp fun = vm->fun;
 
-	if (sexp_procedurep(closure)) {
+	if (sexp_procedurep(fun)) {
 		sexp pc = sexp_make_fixnum(vm->pc);
 		vm->stack[vm->idx] = pc;
 		vm->idx++;
 		
-		vm->env = sexp_closure_env(closure);
-		vm->pc = sexp_closure_pc(closure);
+		vm->env = sexp_closure_env(fun);
+		vm->pc = sexp_closure_pc(fun);
+	} else if (sexp_opcodep(fun)) {
+		switch (sexp_primitive_code(fun)) {
+			case 10:
+			case 13:
+			// cons
+			case 14:
+			// car
+			case 15:
+			// cdr
+			case 16:
+			// pair?
+			case 17:
+			// symbol?
+			case 18:
+			// eq?
+			case 19:
+			default:
+				break;
+		// TODO	
+		}
 	} else {
 		return -1;
+	}
+	return 1;
+}
+
+static int
+INVOKE0(struct vm *vm) {
+	switch (vm->code[vm->pc]) {
+		case 88:
+		//(read)
+		case 89:
+		// (newline)
+		default:
+			return -1;
 	}
 	return 1;
 }
@@ -241,49 +307,78 @@ RETURN(struct vm *vm) {
 
 static int
 SHALLOW_ARGUMENT_REF(struct vm *vm) {
-	char pc = vm->code[vm->pc];
+	char code = vm->code[vm->pc];
 	
-	if (pc >=1 && pc < 5) {
-		vm->val = activation_frame_argument(vm->env, pc - 1);
+	if (code >=1 && code < 5) {
+		vm->val = activation_frame_argument(vm->env, code - 1);
 		return 1;
-	} else if (pc == 5) {
-		vm->val = activation_frame_argument(vm->env, vm->code[pc+1]);
+	} else if (code == 5) {
+		vm->val = activation_frame_argument(vm->env, vm->code[code + 1]);
 		return 2;
 	}
 	return -1;
 }
 
-/*
-static void
+static int
 SET_SHALLOW_ARGUMENT(struct vm *vm) {
-	set_activation_frame_argument(vm->env, 2, vm->val);
-}
-
-static void
-DEEP_ARGUMENT_REF(struct vm *vm) {
-	char i, j;
-	i = vm->code[vm->pc];
-	vm->pc++;
-	j = vm->code[vm->pc];
-	vm->val = deep_fetch(vm->env, i, j);
-}
-
-static void
-SET_DEEP_ARGUMENT(struct vm *vm) {
-	deep_update(vm->env, i, j, vm->val);
-}
-*/
-
-/*
-static void
-CHECKED_GLOBAL_REF(struct vm *vm) {
-	int i = vm->code[vm->pc];
-	vm->val = global_fetch(i);
-	if (vm->val == SEXP_VOID) {
-		printf("Uninitialized global variable");
+	int code = vm->code[vm->pc];
+	
+	if (code >= 21 && code < 25) {
+		set_activation_frame_argument(sexp_car(vm->env), code-21, vm->val);
+		vm->val = SEXP_VOID;
+		return 1;
+	} else if (code == 25) {
+		set_activation_frame_argument(vm->env, vm->code[vm->pc + 1], vm->val);
+		vm->val = SEXP_VOID;
+		return 2;
 	}
+	return -1;
 }
-*/
+
+static int
+DEEP_ARGUMENT_REF(struct vm *vm) {
+	int i, j;
+	i = vm->code[vm->pc + 1];
+	j = vm->code[vm->pc + 2];
+	vm->val = deep_fetch(vm->env, i, j);
+	return 3;
+}
+
+
+static int
+SET_DEEP_ARGUMENT(struct vm *vm) {
+	int i, j;
+	i = vm->code[vm->pc + 1];
+	j = vm->code[vm->pc + 2];
+	deep_update(vm->env, i, j, vm->val);
+	vm->val = SEXP_VOID;
+	return 3;
+}
+
+
+static int
+PREDEFINED(struct vm *vm) {
+	int op = vm->code[vm->pc];
+	
+	if (op >= 10 && op < 19) {
+		vm->val = sexp_make_primitive(op, 0);
+		return 1;
+	} else if (op == 19) {
+		vm->val = sexp_make_primitive(op, vm->code[vm->pc + 1]);
+		return 2;
+	}
+	return -1;
+}
+
+static int
+CHECKED_GLOBAL_REF(struct vm *vm) {
+	int i = vm->code[vm->pc + 1];
+	vm->val = sexp_vector_data(vm->global)[i];
+	if (vm->val == SEXP_VOID) {
+		return -3;	//Uninitialized global variable
+	}
+	return 2;
+}
 
 static int
 GLOBAL_REF(struct vm *vm) {
@@ -339,6 +434,14 @@ JUMP_FALSE(struct vm *vm) {
 }
 
 static int
+ALLOCATE_DOTTED_FRAME(struct vm *vm) {
+	int arity = vm->code[vm->pc + 1];
+	vm->val = allocate_activation_frame(arity);
+	sexp_vector_data(vm->val)[arity - 1] = SEXP_NULL;
+	return 2;
+}					   
+
+static int
 ALLOCATE_FRAME(struct vm *vm) {
 	char pc = vm->code[vm->pc];
 
@@ -371,6 +474,17 @@ POP_FRAME(struct vm *vm) {
 }
 
 static int
+POP_CONS_FRAME(struct vm *vm) {
+	int arity = vm->code[vm->pc + 1];
+	sexp tmp;
+	
+	vm->idx--;
+	tmp = sexp_cons(NULL, vm->stack[vm->idx], sexp_vector_data(vm->val)[arity]);
+	set_activation_frame_argument(vm->val, arity, tmp);
+	return 2;
+}
+
+static int
 EXTEND_ENV(struct vm *vm) {
 	vm->env = sr_extend(vm->env, vm->val);
 	return 1;
@@ -383,19 +497,31 @@ POP_ARG1(struct vm *vm) {
 	return 1;
 }
 
-/*
-static void
+
+static int
 POP_ARG2(struct vm *vm) {
 	vm->idx--;
 	vm->arg2 = vm->stack[vm->idx];
+	return 1;
 }
 
-
-static void
-FUNCTION_GOTO(struct vm *vm) {
-	invoke(vm, true);
+static int
+PACK_FRAME(struct vm *vm) {
+	int i;
+	int arity = vm->code[vm->pc + 1];
+	sexp tmp = SEXP_NULL;
+	for (i = arity; i<sexp_vector_length(vm->val); i++) {
+		tmp = sexp_cons(NULL, sexp_vector_data(vm->val)[i], tmp);
+	}
+	set_activation_frame_argument(vm->val, arity, tmp);
+	return 2;
 }
-*/
+
+static int
+UNLINK_ENV(struct vm *vm) {
+	vm->env = sexp_cdr(vm->env);
+	return 1;
+}
 
 static int
 ARITYEQ(struct vm *vm) {
@@ -423,58 +549,79 @@ initialize() {
 	instructions[2] = SHALLOW_ARGUMENT_REF;
 	instructions[3] = SHALLOW_ARGUMENT_REF;
 	instructions[4] = SHALLOW_ARGUMENT_REF;
-	instructions[5] = SHALLOW_ARGUMENT_REF;
-
+	instructions[5] = SHALLOW_ARGUMENT_REF;	
+	instructions[6] = DEEP_ARGUMENT_REF;
 	instructions[7] = GLOBAL_REF;
+	instructions[8] = CHECKED_GLOBAL_REF;
+	//
 	instructions[10] = CONSTANT;
 	instructions[11] = CONSTANT;
 	instructions[12] = CONSTANT;
-
+	instructions[13] = PREDEFINED;
+	instructions[14] = PREDEFINED;
+	instructions[15] = PREDEFINED;
+	instructions[16] = PREDEFINED;
+	instructions[17] = PREDEFINED;
+	instructions[18] = PREDEFINED;
+	instructions[19] = PREDEFINED;
 	instructions[20] = FINISH;
+	instructions[21] = SET_SHALLOW_ARGUMENT;
+	instructions[22] = SET_SHALLOW_ARGUMENT;
+	instructions[23] = SET_SHALLOW_ARGUMENT;
+	instructions[24] = SET_SHALLOW_ARGUMENT;
+	instructions[25] = SET_SHALLOW_ARGUMENT;
+	instructions[26] = SET_DEEP_ARGUMENT;
 	instructions[27] = SET_GLOBAL;
 	instructions[28] = GOTO;
 	instructions[29] = JUMP_FALSE;
 	instructions[30] = GOTO;
 	instructions[31] = JUMP_FALSE;
 	instructions[32] = EXTEND_ENV;
-	// instructions[33] = UNLINK_ENV;
+	instructions[33] = UNLINK_ENV;
 	instructions[34] = PUSH_VALUE;
 	instructions[35] = POP_ARG1;
-	// instructions[36] = POP_ARG2;
-	// instructions[37] = PRESERVE_ENV;
-	// instructions[38] = RESTORE_ENV;
+	instructions[36] = POP_ARG2;
+	instructions[37] = PRESERVE_ENV;
+	instructions[38] = RESTORE_ENV;
 	instructions[39] = POP_FUNCTION;
 	instructions[40] = CREATE_CLOSURE;
+	//
 	instructions[43] = RETURN;
+	instructions[44] = PACK_FRAME;
 	instructions[45] = FUNCTION_INVOKE;
-	// instructions[46] = FUNCTION_GOTO;
-
+	//
+	instructions[47] = POP_CONS_FRAME;
+	//
+	//
 	instructions[50] = ALLOCATE_FRAME;
 	instructions[51] = ALLOCATE_FRAME;
 	instructions[52] = ALLOCATE_FRAME;
 	instructions[53] = ALLOCATE_FRAME;
 	instructions[54] = ALLOCATE_FRAME;
 	instructions[55] = ALLOCATE_FRAME;
-
+	instructions[56] = ALLOCATE_DOTTED_FRAME;
+	//
 	instructions[60] = POP_FRAME;
 	instructions[61] = POP_FRAME;
 	instructions[62] = POP_FRAME;
 	instructions[63] = POP_FRAME;
 	instructions[64] = POP_FRAME;
-	
+	//
 	instructions[71] = ARITYEQ;
 	instructions[72] = ARITYEQ;
 	instructions[73] = ARITYEQ;
 	instructions[74] = ARITYEQ;
 	instructions[75] = ARITYEQ;
-	
+	//
 	instructions[79] = CONSTANT;
 	instructions[80] = CONSTANT;
 	instructions[81] = CONSTANT;
 	instructions[82] = CONSTANT;
 	instructions[83] = CONSTANT;
 	instructions[84] = CONSTANT;
-
+	//
+	instructions[89] = INVOKE0;
+	instructions[89] = INVOKE0;
 	instructions[90] = INVOKE1;
 	instructions[91] = INVOKE1;
 	instructions[92] = INVOKE1;
@@ -484,7 +631,7 @@ initialize() {
 	instructions[96] = INVOKE1;
 	instructions[97] = INVOKE1;
 	instructions[98] = INVOKE1;
-
+	//
 	instructions[100] = INVOKE2;
 	instructions[101] = INVOKE2;
 	instructions[102] = INVOKE2;
@@ -543,7 +690,11 @@ main(int argc, char *argv[]) {
 	// char bytecode[] = {10, 31, 3, 82, 30, 1, 83, 20};
 	// char bytecode[] = {40, 2, 30, 4, 72, 32, 1, 43, 34, 51, 60, 32, 1, 34, 84, 34, 51, 60, 39, 45, 20};
 	// char bytecode[] = {79, 6, 27, 0, 20};
-	char bytecode[] = {8, 0, 20};
+	// char bytecode[] = {13, 20};
+	// char bytecode[] = {40, 2, 30, 11, 71, 32, 40, 2, 30, 4, 72, 32, 1, 43, 43, 34, 51, 60, 32, 1, 34, 50, 39, 37, 45, 38, 34, 82, 34, 51, 60, 39, 45, 20};
+	// char bytecode[] = {50, 32, 40, 2, 30, 4, 72, 32, 1, 43, 33, 34, 79, 7, 34, 51, 60, 39, 45, 20};
+	// char bytecode[] = {82, 34, 51, 60, 32, 79, 5, 21, 20};
+	char bytecode[] = {82, 34, 83, 34, 84, 34, 56, 2, 47, 1, 47, 1, 60, 32, 2, 20};
 	int succ;
 	sexp global;
 	
@@ -551,6 +702,6 @@ main(int argc, char *argv[]) {
 	initialize();
 	vm_init(&vm);
 	succ = run(&vm, bytecode, global);
-	printf("%ld", sexp_unbox_fixnum(vm.val));
+	printf("%ld", sexp_unbox_fixnum(sexp_car(vm.val)));
 	return 0;
 }
