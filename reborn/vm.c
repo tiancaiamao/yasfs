@@ -1,4 +1,5 @@
 #include "sexp.h"
+#include <stdlib.h>
 
 struct vm {
 	sexp stack[1000];
@@ -14,7 +15,21 @@ struct vm {
 	int pc;	
 
 	sexp global;
+	sexp ctx;
 };
+
+void* sexp_alloc (sexp ctx, size_t size) {
+	return malloc(size);
+}
+
+// otherwise  can't compile
+sexp sexp_apply (sexp ctx, sexp proc, sexp args) {
+	return NULL;
+}
+sexp sexp_make_foreign (sexp ctx, const char *name, int num_args,
+                        int flags, sexp_proc1 f, sexp data) {
+							return NULL;
+}
 
 sexp
 deep_fetch(sexp env, int i, int j) {
@@ -39,14 +54,14 @@ deep_update(sexp env, int i, int j, sexp val) {
 }
 
 sexp
-sr_extend(sexp env, sexp vals) {
-	return sexp_cons(NULL, vals, env);
+sr_extend(sexp ctx, sexp env, sexp vals) {
+	return sexp_cons(ctx, vals, env);
 }
 
 // TODO GC
 sexp 
-allocate_activation_frame(int size) {
-	return sexp_make_vector(NULL, sexp_make_fixnum(size), SEXP_ZERO);
+allocate_activation_frame(sexp ctx, int size) {
+	return sexp_make_vector(ctx, sexp_make_fixnum(size), SEXP_ZERO);
 }
 
 int allocate_activation_frame_length(sexp vals) {
@@ -64,8 +79,8 @@ set_activation_frame_argument(sexp sr, int i, sexp val) {
 }
 
 sexp 
-sexp_make_closure(int pc, sexp env) {
-  sexp proc = sexp_alloc_type(NULL, closure, SEXP_PROCEDURE);
+sexp_make_closure(sexp ctx, int pc, sexp env) {
+  sexp proc = sexp_alloc_type(ctx, closure, SEXP_PROCEDURE);
   sexp_field(proc, closure, SEXP_PROCEDURE, pc) = pc;
   sexp_field(proc, closure, SEXP_PROCEDURE, env) = env;
   return proc;
@@ -75,8 +90,8 @@ sexp_make_closure(int pc, sexp env) {
 #define sexp_closure_pc(x) (sexp_field(x, closure, SEXP_PROCEDURE, pc))
 
 sexp 
-sexp_make_primitive(int code, int code1) {
-	sexp prim = sexp_alloc_type(NULL, primitive, SEXP_OPCODE);
+sexp_make_primitive(sexp ctx, int code, int code1) {
+	sexp prim = sexp_alloc_type(ctx, primitive, SEXP_OPCODE);
 	sexp_field(prim, primitive, SEXP_OPCODE, code) = code;
 	sexp_field(prim, primitive, SEXP_OPCODE, code1) = code1;
 	return prim;
@@ -159,7 +174,7 @@ FINISH(struct vm *vm) {
 static int
 CREATE_CLOSURE(struct vm *vm) {
 	int offset = vm->code[vm->pc + 1];
-	vm->val = sexp_make_closure(vm->pc + offset + 2, vm->env);
+	vm->val = sexp_make_closure(vm->ctx, vm->pc + offset + 2, vm->env);
 	return 2;
 }
 
@@ -254,7 +269,7 @@ static int
 INVOKE2(struct vm *vm) {
 	switch (vm->code[vm->pc]) {
 		case 100:
-			vm->val = sexp_cons(NULL, vm->arg1, vm->val);
+			vm->val = sexp_cons(vm->ctx, vm->arg1, vm->val);
 			break;
 		case 101:
 			vm->val = vm->arg1 == vm->val ? SEXP_TRUE : SEXP_FALSE;
@@ -272,7 +287,7 @@ INVOKE2(struct vm *vm) {
 			vm->val = sexp_fx_sub(vm->arg1, vm->val);
 			break;
 		case 106:
-			vm->val = sexp_equalp(NULL, vm->arg1, vm->val);
+			vm->val = sexp_equalp(vm->ctx, vm->arg1, vm->val);
 			break;
 		case 107:
 			vm->val = sexp_unbox_fixnum(vm->arg1) > sexp_unbox_fixnum(vm->arg2) ? SEXP_TRUE : SEXP_FALSE;
@@ -361,10 +376,10 @@ PREDEFINED(struct vm *vm) {
 	int op = vm->code[vm->pc];
 	
 	if (op >= 10 && op < 19) {
-		vm->val = sexp_make_primitive(op, 0);
+		vm->val = sexp_make_primitive(vm->ctx, op, 0);
 		return 1;
 	} else if (op == 19) {
-		vm->val = sexp_make_primitive(op, vm->code[vm->pc + 1]);
+		vm->val = sexp_make_primitive(vm->ctx, op, vm->code[vm->pc + 1]);
 		return 2;
 	}
 	return -1;
@@ -436,7 +451,7 @@ JUMP_FALSE(struct vm *vm) {
 static int
 ALLOCATE_DOTTED_FRAME(struct vm *vm) {
 	int arity = vm->code[vm->pc + 1];
-	vm->val = allocate_activation_frame(arity);
+	vm->val = allocate_activation_frame(vm->ctx, arity);
 	sexp_vector_data(vm->val)[arity - 1] = SEXP_NULL;
 	return 2;
 }					   
@@ -446,10 +461,10 @@ ALLOCATE_FRAME(struct vm *vm) {
 	char pc = vm->code[vm->pc];
 
 	if (pc >= 50 && pc < 55) {
-		vm->val = allocate_activation_frame(pc - 50);
+		vm->val = allocate_activation_frame(vm->ctx, pc - 50);
 		return 1;
 	} else if (pc == 55) {
-		vm->val = allocate_activation_frame(vm->code[pc+1]);
+		vm->val = allocate_activation_frame(vm->ctx, vm->code[pc+1]);
 		return 2;
 	} 
 	return -1;
@@ -479,14 +494,14 @@ POP_CONS_FRAME(struct vm *vm) {
 	sexp tmp;
 	
 	vm->idx--;
-	tmp = sexp_cons(NULL, vm->stack[vm->idx], sexp_vector_data(vm->val)[arity]);
+	tmp = sexp_cons(vm->ctx, vm->stack[vm->idx], sexp_vector_data(vm->val)[arity]);
 	set_activation_frame_argument(vm->val, arity, tmp);
 	return 2;
 }
 
 static int
 EXTEND_ENV(struct vm *vm) {
-	vm->env = sr_extend(vm->env, vm->val);
+	vm->env = sr_extend(vm->ctx, vm->env, vm->val);
 	return 1;
 }
 
@@ -511,7 +526,7 @@ PACK_FRAME(struct vm *vm) {
 	int arity = vm->code[vm->pc + 1];
 	sexp tmp = SEXP_NULL;
 	for (i = arity; i<sexp_vector_length(vm->val); i++) {
-		tmp = sexp_cons(NULL, sexp_vector_data(vm->val)[i], tmp);
+		tmp = sexp_cons(vm->ctx, sexp_vector_data(vm->val)[i], tmp);
 	}
 	set_activation_frame_argument(vm->val, arity, tmp);
 	return 2;
@@ -648,15 +663,21 @@ initialize() {
 }
 
 int
-run(struct vm *vm, char *code, sexp global) {
+run(struct vm *vm, sexp code, sexp global) {
 	int offset;
 	int op;
-	
-	vm->code = code;
+	int i;
+	char *bytecode;
+
+	bytecode = (char*)malloc(sexp_vector_length(code));	
+	for (i = 0; i < sexp_vector_length(code); i++) {
+		bytecode[i] = sexp_unbox_fixnum(sexp_vector_data(code)[i]);
+	}
+	vm->code = bytecode;
 	vm->global = global;
 	
 	for ( ; ;) {
-		op = code[vm->pc];
+		op = bytecode[vm->pc];
 		offset = instructions[op](vm);
 		
 		if (offset < 0) {
@@ -670,6 +691,11 @@ run(struct vm *vm, char *code, sexp global) {
 	return 0;
 }
 
+sexp sexp_make_eval_context (sexp ctx, sexp stack, sexp env, sexp_uint_t size, sexp_uint_t max_size) {
+	sexp res = sexp_make_context(ctx, size, max_size);
+	return res;
+}
+
 void
 vm_init(struct vm *vm) {
 	vm->idx = 0;
@@ -679,28 +705,22 @@ vm_init(struct vm *vm) {
 	vm->val = SEXP_VOID;
 	vm->fun = SEXP_VOID;
 	vm->arg1 = SEXP_VOID;
-	vm->arg2 = SEXP_VOID;		
+	vm->arg2 = SEXP_VOID;
+	
+	vm->ctx = sexp_make_context(NULL, 0, 0);
 }
 
 int
 main(int argc, char *argv[]) {
 	struct vm vm;
-	// char bytecode[] = {82, 34, 83, 34, 52, 61, 60, 32, 1, 34, 2, 35, 104, 20};
-	// char bytecode[] = {40, 2, 30, 8, 72, 32, 1, 34, 82, 35, 104, 43, 20};
-	// char bytecode[] = {10, 31, 3, 82, 30, 1, 83, 20};
-	// char bytecode[] = {40, 2, 30, 4, 72, 32, 1, 43, 34, 51, 60, 32, 1, 34, 84, 34, 51, 60, 39, 45, 20};
-	// char bytecode[] = {79, 6, 27, 0, 20};
-	// char bytecode[] = {13, 20};
-	// char bytecode[] = {40, 2, 30, 11, 71, 32, 40, 2, 30, 4, 72, 32, 1, 43, 43, 34, 51, 60, 32, 1, 34, 50, 39, 37, 45, 38, 34, 82, 34, 51, 60, 39, 45, 20};
-	// char bytecode[] = {50, 32, 40, 2, 30, 4, 72, 32, 1, 43, 33, 34, 79, 7, 34, 51, 60, 39, 45, 20};
-	// char bytecode[] = {82, 34, 51, 60, 32, 79, 5, 21, 20};
-	char bytecode[] = {82, 34, 83, 34, 84, 34, 56, 2, 47, 1, 47, 1, 60, 32, 2, 20};
 	int succ;
 	sexp global;
+	sexp bytecode;
 	
-	global = sexp_make_vector(NULL, SEXP_ONE, SEXP_ONE);
+	global = sexp_make_vector(vm.ctx, SEXP_ONE, SEXP_ONE);
 	initialize();
 	vm_init(&vm);
+	bytecode = sexp_read_from_string(vm.ctx, "#(40  2  30  34  73  32  1  34 106  31  3  82  30  21  1 34  82  35 34  2  34  52  61  60  39  37  45  38  35  109  43 32  1  34  79  5  34  1  34  52  61  60  39  45 20)", -1);
 	succ = run(&vm, bytecode, global);
 	printf("%ld", sexp_unbox_fixnum(sexp_car(vm.val)));
 	return 0;
