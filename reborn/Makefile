@@ -1,0 +1,2 @@
+all:
+	gcc -g -Wall sexp.c vm.c -DSEXP_USE_NO_FEATURES -DSEXP_USE_GLOBAL_HEAP -DSEXP_USE_MALLOC

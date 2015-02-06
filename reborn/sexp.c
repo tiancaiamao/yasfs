@@ -492,7 +492,7 @@ sexp sexp_make_context (sexp ctx, size_t size, size_t max_size) {
     sexp_context_dk(res) = sexp_context_dk(ctx);
     sexp_gc_release1(ctx);
   } else {
-    sexp_init_context_globals(res);
+    // sexp_init_context_globals(res);
   }
   return res;
 }
@@ -2339,7 +2339,7 @@ sexp sexp_read_string (sexp ctx, sexp in, int sentinel) {
       break;
     }
     buf[i++] = c;
-  maybe_expand:
+ // maybe_expand:
     if (i+4 >= size) {       /* expand buffer w/ malloc(), later free() it */
       tmp = (char*) sexp_malloc(size*2);
       if (!tmp) {res = sexp_global(ctx, SEXP_G_OOM_ERROR); break;}

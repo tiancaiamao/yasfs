@@ -18,10 +18,6 @@ struct vm {
 	sexp ctx;
 };
 
-void* sexp_alloc (sexp ctx, size_t size) {
-	return malloc(size);
-}
-
 // otherwise  can't compile
 sexp sexp_apply (sexp ctx, sexp proc, sexp args) {
 	return NULL;
@@ -290,22 +286,22 @@ INVOKE2(struct vm *vm) {
 			vm->val = sexp_equalp(vm->ctx, vm->arg1, vm->val);
 			break;
 		case 107:
-			vm->val = sexp_unbox_fixnum(vm->arg1) > sexp_unbox_fixnum(vm->arg2) ? SEXP_TRUE : SEXP_FALSE;
+			vm->val = sexp_unbox_fixnum(vm->val) > sexp_unbox_fixnum(vm->arg1) ? SEXP_TRUE : SEXP_FALSE;
 			break;
 		case 108:
-			vm->val = sexp_unbox_fixnum(vm->arg1) < sexp_unbox_fixnum(vm->arg2) ? SEXP_TRUE : SEXP_FALSE;
+			vm->val = sexp_unbox_fixnum(vm->val) < sexp_unbox_fixnum(vm->arg1) ? SEXP_TRUE : SEXP_FALSE;
 			break;
 		case 109:
-			vm->val = sexp_make_fixnum(sexp_unbox_fixnum(vm->arg1) * sexp_unbox_fixnum(vm->arg2));
+			vm->val = sexp_make_fixnum(sexp_unbox_fixnum(vm->arg1) * sexp_unbox_fixnum(vm->val));
 			break;
 		case 110:
-			vm->val = sexp_unbox_fixnum(vm->arg1) <= sexp_unbox_fixnum(vm->arg2) ? SEXP_TRUE : SEXP_FALSE;
+			vm->val = sexp_unbox_fixnum(vm->val) <= sexp_unbox_fixnum(vm->arg1) ? SEXP_TRUE : SEXP_FALSE;
 			break;
 		case 111:
-			vm->val = sexp_unbox_fixnum(vm->arg1) >= sexp_unbox_fixnum(vm->arg2) ? SEXP_TRUE : SEXP_FALSE;
+			vm->val = sexp_unbox_fixnum(vm->val) >= sexp_unbox_fixnum(vm->arg1) ? SEXP_TRUE : SEXP_FALSE;
 			break;
 		case 112:
-			vm->val = sexp_make_fixnum(sexp_unbox_fixnum(vm->arg1) % sexp_unbox_fixnum(vm->arg2));
+			vm->val = sexp_make_fixnum(sexp_unbox_fixnum(vm->val) % sexp_unbox_fixnum(vm->arg1));
 			break;
 		default:
 			return -1;
@@ -716,12 +712,17 @@ main(int argc, char *argv[]) {
 	int succ;
 	sexp global;
 	sexp bytecode;
+	const char *str = "#(79 5 34 84 35 108 31 4 79 42 30 2 79 10 20)";
 	
 	global = sexp_make_vector(vm.ctx, SEXP_ONE, SEXP_ONE);
 	initialize();
 	vm_init(&vm);
-	bytecode = sexp_read_from_string(vm.ctx, "#(40  2  30  34  73  32  1  34 106  31  3  82  30  21  1 34  82  35 34  2  34  52  61  60  39  37  45  38  35  109  43 32  1  34  79  5  34  1  34  52  61  60  39  45 20)", -1);
+	bytecode = sexp_read_from_string(vm.ctx, str, -1);
 	succ = run(&vm, bytecode, global);
-	printf("%ld", sexp_unbox_fixnum(sexp_car(vm.val)));
+	if (succ != 0) {
+		printf("失败了%d\n", succ);
+	} else {
+		printf("%ld", sexp_unbox_fixnum(vm.val));		
+	}
 	return 0;
 }
