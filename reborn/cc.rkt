@@ -11,6 +11,7 @@
         ((if)     (meaning-alternative (cadr e) (caddr e) (cadddr e) r tail?))
         ((begin)  (meaning-sequence (cdr e) r tail?))
         ((set!)   (meaning-assignment (cadr e) (caddr e) r tail?))
+        ((define) (meaning-define (cadr e) (caddr e) r tail?))
         (else     (meaning-application (car e) (cdr e) r tail?)) ) ) )
 
 (define (meaning-reference n r tail?)
@@ -42,7 +43,7 @@
 
 (define (meaning-assignment n e r tail?) 
   (let ((m (meaning e r #f))
-        (kind (compute-kind r n)) )
+        (kind (compute-kind r n)))
     (if kind
         (case (car kind)
           ((local)
@@ -50,13 +51,22 @@
                  (j (cddr kind)) )
              (if (= i 0)
                  (SHALLOW-ARGUMENT-SET! j m)
-                 (DEEP-ARGUMENT-SET! i j m) ) ) )
+                 (DEEP-ARGUMENT-SET! i j m))))
           ((global)
            (let ((i (cdr kind)))
              (GLOBAL-SET! i m) ) )
           ((predefined)
            (static-wrong "Immutable predefined variable" n) ) )
         (static-wrong "No such variable" n) ) ) )
+
+(define *defined* '())
+
+(define (meaning-define n e r tail?)
+  (let ((b (memq n *defined*)))
+    (if (pair? b) 
+        (static-wrong "Already defined variable" n)
+        (set! *defined* (cons n *defined*))))
+  (meaning-assignment n e r tail?))
 
 (define (meaning-sequence e+ r tail?)
   (if (pair? e+)
@@ -215,7 +225,10 @@
   (lambda (v)
     (not (pair? v))))
 
-(define static-wrong 'wait)
+(define (static-wrong msg v)
+  (display msg)
+  (display v)
+  (newline))
 
 ;;; Determine the nature of a variable.
 ;;; Three different answers. Or the variable is local (ie appears in R)
@@ -227,8 +240,12 @@
 (define (compute-kind r n)
   (or (local-variable? r 0 n)
       (global-variable? g.current n)
-      (global-variable? g.init n) ) )
+      (global-variable? g.init n)
+      (adjoin-global-variable! n)))
 
+(define (adjoin-global-variable! name)
+  (let ((index (g.current-extend! name)))
+    (cdr (car g.current))))
 
 (define (r-extend* r n*)
   (cons n* r) )
@@ -248,8 +265,8 @@
 (define (g.current-extend! n)
   (let ((level (length g.current)))
     (set! g.current 
-          (cons (cons n `(global . ,level)) g.current) )
-    level ) )
+          (cons (cons n `(global . ,level)) g.current))
+    level))
 
 (define (global-variable? g n)
   (let ((var (assq n g)))
@@ -276,8 +293,8 @@
 (define (g.init-extend! n)
   (let ((level (length g.init)))
     (set! g.init
-          (cons (cons n `(predefined . ,level)) g.init) )
-    level ) )
+          (cons (cons n `(predefined . ,level)) g.init))
+    level ))
 
 (define (g.init-initialize! name value)
   (let ((kind (compute-kind r.init name)))
