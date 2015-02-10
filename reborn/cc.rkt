@@ -1,240 +1,237 @@
-#lang racket
+#lang racket            
 
 ;;-----------------------compiler---------------------------
-((lambda (Y meaning meaning-reference meaning-quotation meaning-alternative meaning*-multiple-sequence
-            meaning-assignment meaning-sequence meaning*-single-sequence meaning-abstraction
-            meaning-fix-abstraction meaning-dotted-abstraction)
-   (set! Y
-         (lambda (F)
-           ((lambda (u) (u u))
-            (lambda (x)
-              (F (lambda (v) ((x x) v)))))))
-   (set! meaning
-         (lambda (e r tail?)
-           (if (atom? e)
-               (if (symbol? e) (meaning-reference e r tail?)
-                   (meaning-quotation e r tail?) )
-               (case (car e)
-                 ((quote)  (meaning-quotation (cadr e) r tail?))
-                 ((lambda) (meaning-abstraction (cadr e) (cddr e) r tail?))
-                 ((if)     (meaning-alternative (cadr e) (caddr e) (cadddr e) r tail?))
-                 ((begin)  (meaning-sequence (cdr e) r tail?))
-                 ((set!)   (meaning-assignment (cadr e) (caddr e) r tail?))
-                 (else     (meaning-application (car e) (cdr e) r tail?))))))
-   
-   (set! meaning-reference
-         (lambda (n r tail?)
-           (let ((kind (compute-kind r n)))
-             (if kind
-                 (case (car kind)
-                   ((local)
-                    (let ((i (cadr kind))
-                          (j (cddr kind)) )
-                      (if (= i 0)
-                          (SHALLOW-ARGUMENT-REF j)
-                          (DEEP-ARGUMENT-REF i j) ) ) )
-                   ((global)
-                    (let ((i (cdr kind)))
-                      (CHECKED-GLOBAL-REF i) ) )
-                   ((predefined)
-                    (let ((i (cdr kind)))
-                      (PREDEFINED i) ) ) )
-                 (static-wrong "No such variable" n)))))
-   
-   (set! meaning-quotation
-         (lambda (v r tail?)
-           (CONSTANT v)))
-   
-   (set! meaning-alternative
-         (lambda (e1 e2 e3 r tail?)
-           (let ((m1 (meaning e1 r #f))
-                 (m2 (meaning e2 r tail?))
-                 (m3 (meaning e3 r tail?)))
-             (ALTERNATIVE m1 m2 m3))))
-   
-   (set! meaning-assignment
-         (lambda (n e r tail?)
-           (let ((m (meaning e r #f))
-                 (kind (compute-kind r n)))
-             (if kind
-                 (case (car kind)
-                   ((local)
-                    (let ((i (cadr kind))
-                          (j (cddr kind)) )
-                      (if (= i 0)
-                          (SHALLOW-ARGUMENT-SET! j m)
-                          (DEEP-ARGUMENT-SET! i j m))))
-                   ((global)
-                    (let ((i (cdr kind)))
-                      (GLOBAL-SET! i m)))
-                   ((predefined)
-                    (static-wrong "Immutable predefined variable" n)))
-                 (static-wrong "No such variable" n)))))
-   
-   (set! meaning-sequence
-         (lambda (e+ r tail?)
-           (if (pair? e+)
-               (if (pair? (cdr e+))
-                   (meaning*-multiple-sequence (car e+) (cdr e+) r tail?)
-                   (meaning*-single-sequence (car e+) r tail?))
-               (static-wrong "Illegal syntax: (begin)"))))
-   
-   (set! meaning*-single-sequence
-         (lambda (e r tail?) 
-           (meaning e r tail?)))
-   
-   (set! meaning*-multiple-sequence
-         (lambda (e e+ r tail?)
-           ((lambda (m1 m+)
-              (SEQUENCE m1 m+))
-            (meaning e r #f)
-            (meaning-sequence e+ r tail?))))
-   
-   (set! meaning-abstraction
-         (lambda (nn* e+ r tail?)
-           ((Y (lambda (parse)
-                 (lambda (n* regular)
-                   (cond
-                     ((pair? n*) (parse (cdr n*) (cons (car n*) regular)))
-                     ((null? n*) (meaning-fix-abstraction nn* e+ r tail?))
-                     (else       (meaning-dotted-abstraction 
-                                  (reverse regular) n* e+ r tail?))))))
-            nn* '())))
-   
-   (set! meaning-fix-abstraction
-         (lambda (n* e+ r tail?)
-           ((lambda (arity r2 m+)
-              (set! arity (length n*))
-              (set! r2 (r-extend* r n*))
-              (set! m+ (meaning-sequence e+ r2 #t))
-              (FIX-CLOSURE m+ arity))
-            'ig 'ig 'ig)))
-   
-   (set! meaning-dotted-abstraction
-         (lambda (n* n e+ r tail?)
-           ((lambda (arity r2 m+)
-              (set! arity (length n*))
-              (set! r2 (r-extend* r (append n* (list n))))
-              (set! m+ (meaning-sequence e+ r2 #t))
-              (NARY-CLOSURE m+ arity))
-            'ig 'ig 'ig)))
-   ) ('ig 'ig 'ig 'ig 'ig 'ig 'ig 'ig 'ig))
+(define meaning
+  (lambda (e r tail?)
+    (if (atom? e)
+        (if (symbol? e) (meaning-reference e r tail?)
+            (meaning-quotation e r tail?) )
+        (case (car e)
+          ((quote)  (meaning-quotation (cadr e) r tail?))
+          ((lambda) (meaning-abstraction (cadr e) (cddr e) r tail?))
+          ((if)     (meaning-alternative (cadr e) (caddr e) (cadddr e) r tail?))
+          ((begin)  (meaning-sequence (cdr e) r tail?))
+          ((set!)   (meaning-assignment (cadr e) (caddr e) r tail?))
+          (else     (meaning-application (car e) (cdr e) r tail?))))))
 
-(define (meaning-application e e* r tail?)
-  (cond ((and (symbol? e)
-              (let ((kind (compute-kind r e)))
-                (and (pair? kind)
-                     (eq? 'predefined (car kind))
-                     (let ((desc (get-description e)))
-                       (and desc
-                            (eq? 'function (car desc))
-                            (or (= (length (cddr desc)) (length e*))
-                                (static-wrong 
-                                 "Incorrect arity for primitive" e )
-                                ) ) ) ) ) )
-         (meaning-primitive-application e e* r tail?) )
-        ((and (pair? e)
-              (eq? 'lambda (car e)) )
-         (meaning-closed-application e e* r tail?) )
-        (else (meaning-regular-application e e* r tail?)) ) )
+(define meaning-reference
+  (lambda (n r tail?)
+    (let ((kind (compute-kind r n)))
+      (if kind
+          (case (car kind)
+            ((local)
+             (let ((i (cadr kind))
+                   (j (cddr kind)) )
+               (if (= i 0)
+                   (SHALLOW-ARGUMENT-REF j)
+                   (DEEP-ARGUMENT-REF i j) ) ) )
+            ((global)
+             (let ((i (cdr kind)))
+               (CHECKED-GLOBAL-REF i) ) )
+            ((predefined)
+             (let ((i (cdr kind)))
+               (PREDEFINED i) ) ) )
+          (static-wrong "No such variable" n)))))
+
+(define meaning-quotation
+  (lambda (v r tail?)
+    (CONSTANT v)))
+
+(define meaning-alternative
+  (lambda (e1 e2 e3 r tail?)
+    (let ((m1 (meaning e1 r #f))
+          (m2 (meaning e2 r tail?))
+          (m3 (meaning e3 r tail?)))
+      (ALTERNATIVE m1 m2 m3))))
+
+(define meaning-assignment
+  (lambda (n e r tail?)
+    (let ((m (meaning e r #f))
+          (kind (compute-kind r n)))
+      (if kind
+          (case (car kind)
+            ((local)
+             (let ((i (cadr kind))
+                   (j (cddr kind)) )
+               (if (= i 0)
+                   (SHALLOW-ARGUMENT-SET! j m)
+                   (DEEP-ARGUMENT-SET! i j m))))
+            ((global)
+             (let ((i (cdr kind)))
+               (GLOBAL-SET! i m)))
+            ((predefined)
+             (static-wrong "Immutable predefined variable" n)))
+          (static-wrong "No such variable" n)))))
+
+(define meaning-sequence
+  (lambda (e+ r tail?)
+    (if (pair? e+)
+        (if (pair? (cdr e+))
+            (meaning*-multiple-sequence (car e+) (cdr e+) r tail?)
+            (meaning*-single-sequence (car e+) r tail?))
+        (static-wrong "Illegal syntax: (begin)"))))
+
+(define meaning*-single-sequence
+  (lambda (e r tail?) 
+    (meaning e r tail?)))
+
+(define meaning*-multiple-sequence
+  (lambda (e e+ r tail?)
+    ((lambda (m1 m+)
+       (SEQUENCE m1 m+))
+     (meaning e r #f)
+     (meaning-sequence e+ r tail?))))
+
+(define meaning-abstraction
+  (lambda (nn* e+ r tail?)
+    (let parse ((n* nn*)
+                (regular '()))
+      (cond
+        ((pair? n*) (parse (cdr n*) (cons (car n*) regular)))
+        ((null? n*) (meaning-fix-abstraction nn* e+ r tail?))
+        (else       (meaning-dotted-abstraction 
+                     (reverse regular) n* e+ r tail?))))))
+
+(define meaning-fix-abstraction
+  (lambda (n* e+ r tail?)
+    ((lambda (arity r2 m+)
+       (set! arity (length n*))
+       (set! r2 (r-extend* r n*))
+       (set! m+ (meaning-sequence e+ r2 #t))
+       (FIX-CLOSURE m+ arity))
+     'ig 'ig 'ig)))
+
+(define meaning-dotted-abstraction
+  (lambda (n* n e+ r tail?)
+    (let* ((arity (length n*))
+           (r2 (r-extend* r (append n* (list n))))
+           (m+ (meaning-sequence e+ r2 #t)))
+      (NARY-CLOSURE m+ arity))))
+
+(define meaning-application
+  (lambda (e e* r tail?)
+    (cond ((and (symbol? e)
+                (let ((kind (compute-kind r e)))
+                  (and (pair? kind)
+                       (eq? 'predefined (car kind))
+                       (let ((desc (get-description e)))
+                         (and desc
+                              (eq? 'function (car desc))
+                              (or (= (length (cddr desc)) (length e*))
+                                  (static-wrong 
+                                   "Incorrect arity for primitive" e )))))))
+           (meaning-primitive-application e e* r tail?))
+          ((and (pair? e)
+                (eq? 'lambda (car e)) )
+           (meaning-closed-application e e* r tail?) )
+          (else (meaning-regular-application e e* r tail?)))))
 
 ;;; Parse the variable list to check the arity and detect wether the
 ;;; abstraction is dotted or not.
-(define (meaning-closed-application e ee* r tail?)
-  (let ((nn* (cadr e)))
-    (let parse ((n* nn*)
-                (e* ee*)
-                (regular '()) )
-      (cond
-        ((pair? n*) 
-         (if (pair? e*)
-             (parse (cdr n*) (cdr e*) (cons (car n*) regular))
-             (static-wrong "Too less arguments" e ee*) ) )
-        ((null? n*)
-         (if (null? e*)
-             (meaning-fix-closed-application 
-              nn* (cddr e) ee* r tail? )
-             (static-wrong "Too much arguments" e ee*) ) )
-        (else (meaning-dotted-closed-application 
-               (reverse regular) n* (cddr e) ee* r tail? )) ) ) ) )
+(define meaning-closed-application
+  (lambda (e ee* r tail?)
+    (let ((nn* (cadr e)))
+      (let parse ((n* nn*)
+                  (e* ee*)
+                  (regular '()) )
+        (cond
+          ((pair? n*) 
+           (if (pair? e*)
+               (parse (cdr n*) (cdr e*) (cons (car n*) regular))
+               (static-wrong "Too less arguments" e ee*) ) )
+          ((null? n*)
+           (if (null? e*)
+               (meaning-fix-closed-application 
+                nn* (cddr e) ee* r tail? )
+               (static-wrong "Too much arguments" e ee*) ) )
+          (else (meaning-dotted-closed-application 
+                 (reverse regular) n* (cddr e) ee* r tail? )))))))
 
-(define (meaning-fix-closed-application n* body e* r tail?)
-  (let* ((m* (meaning* e* r (length e*) #f))
-         (r2 (r-extend* r n*))
-         (m+ (meaning-sequence body r2 tail?)))
-    (if tail? (TR-FIX-LET m* m+) 
-        (FIX-LET m* m+) ) ) )
+(define meaning-fix-closed-application
+  (lambda (n* body e* r tail?)
+    (let* ((m* (meaning* e* r (length e*) #f))
+           (r2 (r-extend* r n*))
+           (m+ (meaning-sequence body r2 tail?)))
+      (if tail? (TR-FIX-LET m* m+) 
+          (FIX-LET m* m+)))))
 
-(define (meaning-dotted-closed-application n* n body e* r tail?)
-  (let* ((m* (meaning-dotted* e* r (length e*) (length n*) #f))
-         (r2 (r-extend* r (append n* (list n))))
-         (m+ (meaning-sequence body r2 tail?)) )
-    (if tail? (TR-FIX-LET m* m+)
-        (FIX-LET m* m+) ) ) )
+(define meaning-dotted-closed-application
+  (lambda (n* n body e* r tail?)
+    (let* ((m* (meaning-dotted* e* r (length e*) (length n*) #f))
+           (r2 (r-extend* r (append n* (list n))))
+           (m+ (meaning-sequence body r2 tail?)) )
+      (if tail? (TR-FIX-LET m* m+)
+          (FIX-LET m* m+)))))
 
 ;;; Handles a call to a predefined primitive. The arity is already checked.
 ;;; The optimization is to avoid the allocation of the activation frame.
 ;;; These primitives never change the *env* register nor have control effect.
-(define (meaning-primitive-application e e* r tail?)
-  (let* ((desc (get-description e))
-         ;; desc = (function address . variables-list)
-         (address (cadr desc))
-         (size (length e*)) )
-    (case size
-      ((0) (CALL0 address))
-      ((1) 
-       (let ((m1 (meaning (car e*) r #f)))
-         (CALL1 address m1) ) )
-      ((2) 
-       (let ((m1 (meaning (car e*) r #f))
-             (m2 (meaning (cadr e*) r #f)) )
-         (CALL2 address m1 m2) ) )
-      ((3) 
-       (let ((m1 (meaning (car e*) r #f))
-             (m2 (meaning (cadr e*) r #f))
-             (m3 (meaning (caddr e*) r #f)) )
-         (CALL3 address m1 m2 m3) ) )
-      (else (meaning-regular-application e e* r tail?)) ) ) )
+(define meaning-primitive-application
+  (lambda (e e* r tail?)
+    (let* ((desc (get-description e))
+           ;; desc = (function address . variables-list)
+           (address (cadr desc))
+           (size (length e*)) )
+      (case size
+        ((0) (CALL0 address))
+        ((1) 
+         (let ((m1 (meaning (car e*) r #f)))
+           (CALL1 address m1) ) )
+        ((2) 
+         (let ((m1 (meaning (car e*) r #f))
+               (m2 (meaning (cadr e*) r #f)) )
+           (CALL2 address m1 m2) ) )
+        ((3) 
+         (let ((m1 (meaning (car e*) r #f))
+               (m2 (meaning (cadr e*) r #f))
+               (m3 (meaning (caddr e*) r #f)) )
+           (CALL3 address m1 m2 m3) ) )
+        (else (meaning-regular-application e e* r tail?)) ) ) ))
 
 ;;; In a regular application, the invocation protocol is to call the
 ;;; function with an activation frame and a continuation: (f v* k).
-(define (meaning-regular-application e e* r tail?)
-  (let* ((m (meaning e r #f))
-         (m* (meaning* e* r (length e*) #f)) )
-    (if tail? (TR-REGULAR-CALL m m*) (REGULAR-CALL m m*)) ) )
+(define meaning-regular-application
+  (lambda (e e* r tail?)
+    (let* ((m (meaning e r #f))
+           (m* (meaning* e* r (length e*) #f)) )
+      (if tail? (TR-REGULAR-CALL m m*) (REGULAR-CALL m m*)))))
 
-(define (meaning* e* r size tail?)
-  (if (pair? e*)
-      (meaning-some-arguments (car e*) (cdr e*) r size tail?)
-      (meaning-no-argument r size tail?) ) )
+(define meaning* 
+  (lambda (e* r size tail?)
+    (if (pair? e*)
+        (meaning-some-arguments (car e*) (cdr e*) r size tail?)
+        (meaning-no-argument r size tail?))))
 
-(define (meaning-dotted* e* r size arity tail?)
-  (if (pair? e*)
-      (meaning-some-dotted-arguments (car e*) (cdr e*) 
-                                     r size arity tail? )
-      (meaning-no-dotted-argument r size arity tail?) ) )
+(define meaning-dotted*
+  (lambda (e* r size arity tail?)
+    (if (pair? e*)
+        (meaning-some-dotted-arguments (car e*) (cdr e*) 
+                                       r size arity tail? )
+        (meaning-no-dotted-argument r size arity tail?) ) ))
 
-(define (meaning-some-arguments e e* r size tail?)
-  (let ((m (meaning e r #f))
-        (m* (meaning* e* r size tail?))
-        (rank (- size (+ (length e*) 1))) )
-    (STORE-ARGUMENT m m* rank) ) )
+(define meaning-some-arguments
+  (lambda (e e* r size tail?)
+    (let ((m (meaning e r #f))
+          (m* (meaning* e* r size tail?))
+          (rank (- size (+ (length e*) 1))) )
+      (STORE-ARGUMENT m m* rank))))
 
-(define (meaning-some-dotted-arguments e e* r size arity tail?)
-  (let ((m (meaning e r #f))
-        (m* (meaning-dotted* e* r size arity tail?))
-        (rank (- size (+ (length e*) 1))) )
-    (if (< rank arity) (STORE-ARGUMENT m m* rank)
-        (CONS-ARGUMENT m m* arity) ) ) )
+(define meaning-some-dotted-arguments
+  (lambda (e e* r size arity tail?)
+    (let ((m (meaning e r #f))
+          (m* (meaning-dotted* e* r size arity tail?))
+          (rank (- size (+ (length e*) 1))) )
+      (if (< rank arity) (STORE-ARGUMENT m m* rank)
+          (CONS-ARGUMENT m m* arity)))))
 
-(define (meaning-no-argument r size tail?)
-  (ALLOCATE-FRAME size) )
+(define meaning-no-argument
+  (lambda (r size tail?)
+    (ALLOCATE-FRAME size)))
 
-(define (meaning-no-dotted-argument r size arity tail?)
-  (ALLOCATE-DOTTED-FRAME arity) )
+(define meaning-no-dotted-argument
+  (lambda (r size arity tail?)
+    (ALLOCATE-DOTTED-FRAME arity)))
 ;;;-------------------------------------------------------------
-
-
 
 ;;;------------------------utility-----------------------------------
 (define atom?
@@ -256,12 +253,7 @@
 (define (compute-kind r n)
   (or (local-variable? r 0 n)
       (global-variable? g.current n)
-      (global-variable? g.init n)
-      (adjoin-global-variable! n)))
-
-(define (adjoin-global-variable! name)
-  (let ((index (g.current-extend! name)))
-    (cdr (car g.current))))
+      (global-variable? g.init n)))
 
 (define (r-extend* r n*)
   (cons n* r) )
@@ -372,48 +364,79 @@
         (cons (cons name description) desc.init) )
   name )
 
-(define (ALTERNATIVE m1 m2 m3)
-  (let ((mm2 (append m2 (GOTO (length m3)))))
-    (append m1 (JUMP-FALSE (length mm2)) mm2 m3) ) )
-(define (SHALLOW-ARGUMENT-SET! j m)
-  (append m (SET-SHALLOW-ARGUMENT! j)) )
-(define (DEEP-ARGUMENT-SET! i j m)
-  (append m (SET-DEEP-ARGUMENT! i j)) )
-(define (GLOBAL-SET! i m)
-  (append m (SET-GLOBAL! i)) )
-(define (SEQUENCE m m+)
-  (append m m+) )
-(define (FIX-CLOSURE m+ arity)
-  (let* ((the-function (append (ARITY=? (+ arity 1)) (EXTEND-ENV)
-                               m+  (RETURN) ))
-         (the-goto (GOTO (length the-function))) )
-    (append (CREATE-CLOSURE (length the-goto)) the-goto the-function) ) )
-(define (TR-FIX-LET m* m+)
-  (append m* (EXTEND-ENV) m+) )
-(define (FIX-LET m* m+)
-  (append m* (EXTEND-ENV) m+ (UNLINK-ENV)) )
-(define (CALL1 address m1)
-  (append m1 (INVOKE1 address) ) )
-(define (CALL2 address m1 m2)
-  (append m1 (PUSH-VALUE) m2 (POP-ARG1) (INVOKE2 address)) )
-(define (CALL3 address m1 m2 m3)
-  (append m1 (PUSH-VALUE) 
-          m2 (PUSH-VALUE) 
-          m3 (POP-ARG2) (POP-ARG1) (INVOKE3 address) ) )
-(define (TR-REGULAR-CALL m m*)
-  (append m (PUSH-VALUE) m* (POP-FUNCTION) (FUNCTION-INVOKE)) )
-(define (REGULAR-CALL m m*)
-  (append m (PUSH-VALUE) m* (POP-FUNCTION) 
-          (PRESERVE-ENV) (FUNCTION-INVOKE) (RESTORE-ENV) ) )
-(define (NARY-CLOSURE m+ arity)
-  (let* ((the-function (append (ARITY>=? (+ arity 1)) (PACK-FRAME! arity)
-                               (EXTEND-ENV) m+ (RETURN) ))
-         (the-goto (GOTO (length the-function))) )
-    (append (CREATE-CLOSURE (length the-goto)) the-goto the-function) ) )
-(define (STORE-ARGUMENT m m* rank)
-  (append m (PUSH-VALUE) m* (POP-FRAME! rank)) )
-(define (CONS-ARGUMENT m m* arity)
-  (append m (PUSH-VALUE) m* (POP-CONS-FRAME! arity)) )
+(define ALTERNATIVE
+  (lambda (m1 m2 m3)
+    (let ((mm2 (append m2 (GOTO (length m3)))))
+      (append m1 (JUMP-FALSE (length mm2)) mm2 m3))))
+
+(define SHALLOW-ARGUMENT-SET!
+  (lambda (j m)
+    (append m (SET-SHALLOW-ARGUMENT! j))))
+
+(define DEEP-ARGUMENT-SET!
+  (lambda (i j m)
+    (append m (SET-DEEP-ARGUMENT! i j))))
+
+(define GLOBAL-SET!
+  (lambda (i m)
+    (append m (SET-GLOBAL! i))))
+
+(define SEQUENCE 
+  (lambda (m m+)
+    (append m m+)))
+
+(define FIX-CLOSURE
+  (lambda (m+ arity)
+    (let* ((the-function (append (ARITY=? (+ arity 1)) (EXTEND-ENV)
+                                 m+  (RETURN) ))
+           (the-goto (GOTO (length the-function))) )
+      (append (CREATE-CLOSURE (length the-goto)) the-goto the-function) ) ))
+
+(define TR-FIX-LET
+  (lambda (m* m+)
+    (append m* (EXTEND-ENV) m+)))
+
+(define FIX-LET 
+  (lambda (m* m+)
+    (append m* (EXTEND-ENV) m+ (UNLINK-ENV))))
+
+(define CALL1
+  (lambda (address m1)
+    (append m1 (INVOKE1 address) ) ))
+
+(define CALL2
+  (lambda (address m1 m2)
+    (append m1 (PUSH-VALUE) m2 (POP-ARG1) (INVOKE2 address))))
+
+(define CALL3
+  (lambda (address m1 m2 m3)
+    (append m1 (PUSH-VALUE) 
+            m2 (PUSH-VALUE) 
+            m3 (POP-ARG2) (POP-ARG1) (INVOKE3 address))))
+
+(define TR-REGULAR-CALL
+  (lambda (m m*)
+    (append m (PUSH-VALUE) m* (POP-FUNCTION) (FUNCTION-INVOKE))))
+
+(define REGULAR-CALL 
+  (lambda (m m*)
+    (append m (PUSH-VALUE) m* (POP-FUNCTION) 
+            (PRESERVE-ENV) (FUNCTION-INVOKE) (RESTORE-ENV))))
+
+(define NARY-CLOSURE
+  (lambda (m+ arity)
+    (let* ((the-function (append (ARITY>=? (+ arity 1)) (PACK-FRAME! arity)
+                                 (EXTEND-ENV) m+ (RETURN) ))
+           (the-goto (GOTO (length the-function))) )
+      (append (CREATE-CLOSURE (length the-goto)) the-goto the-function) ) ))
+
+(define STORE-ARGUMENT
+  (lambda (m m* rank)
+    (append m (PUSH-VALUE) m* (POP-FRAME! rank))))
+
+(define CONS-ARGUMENT
+  (lambda (m m* arity)
+    (append m (PUSH-VALUE) m* (POP-CONS-FRAME! arity))))
 ;;;---------------------------------------------------
 
 ;;;--------------------initialize--------------------------
@@ -501,45 +524,46 @@
 
 ;;;----------------------assemble provider-------------------
 (define (assemble-provider)
-  (set! SHALLOW-ARGUMENT-REF (lambda (j) (list 'SHALLOW-ARGUMENT-REF j)))
-  (set! DEEP-ARGUMENT-REF (lambda (i j) (list 'DEEP-ARGUMENT-REF i j)))
-  (set! SET-DEEP-ARGUMENT! (lambda (i j) (list 'SET-DEEP-ARGUMENT! i j)))
-  (set! CHECKED-GLOBAL-REF (lambda (i) (list 'CHECKED-GLOBAL-REF i)))
-  (set! CONSTANT (lambda (v) (list 'CONSTANT v)))
-  (set! GOTO (lambda (offset) (list 'GOTO offset)))
-  (set! UNLINK-ENV (lambda () (list 'UNLINK-ENV)))
-  (set! INVOKE1 (lambda (address) (list 'INVOKE1 address)))
-  (set! POP-ARG1 (lambda () (list 'POP-ARG1)))
-  (set! POP-ARG2 (lambda () (list 'POP-ARG2)))
-  (set! CREATE-CLOSURE (lambda (offset) (list 'CREATE-CLOSURE offset)))
-  (set! RETURN (lambda () (list 'RETURN)))
-  (set! ARITY>=? (lambda (arity+1) (list 'ARITY>=? arity+1)))
-  (set! FUNCTION-INVOKE (lambda () (list 'FUNCTION-INVOKE)))
-  (set! RESTORE-ENV (lambda () (list 'RESTORE-ENV)))
-  (set! POP-CONS-FRAME! (lambda (arity) (list 'POP-CONS-FRAME! arity)))
-  (set! ALLOCATE-DOTTED-FRAME (lambda (arity) (list 'ALLOCATE-DOTTED-FRAME arity)))
-  (set! PREDEFINED (lambda (i) (list 'PREDEFINED i)))
-  (set! SET-SHALLOW-ARGUMENT! (lambda (j) (list 'SET-SHALLOW-ARGUMENT! j)))
-  (set! GLOBAL-REF (lambda (i) (list 'GLOBAL-REF i)))
-  (set! SET-GLOBAL! (lambda (i) (list 'SET-GLOBAL! i)))
-  (set! JUMP-FALSE (lambda (offset) (list 'JUMP-FALSE offset)))
-  (set! EXTEND-ENV (lambda () (list 'EXTEND-ENV)))
-  (set! CALL0 (lambda (address) (list 'CALL0 address)))
-  (set! PUSH-VALUE (lambda () (list 'PUSH-VALUE)))
-  (set! INVOKE2 (lambda (address) (list 'INVOKE2 address)))
-  (set! INVOKE3 (lambda (address) (list 'INVOKE3 address)))
-  (set! ARITY=? (lambda (arity+1) (list 'ARITY=? arity+1)))
-  (set! PACK-FRAME! (lambda (arity) (list 'PACK-FRAME! arity)))
-  (set! POP-FUNCTION (lambda () (list 'POP-FUNCTION)))
-  (set! PRESERVE-ENV (lambda () (list 'PRESERVE-ENV)))
-  (set! POP-FRAME! (lambda (rank) (list 'POP-FRAME! rank)))
-  (set! ALLOCATE-FRAME (lambda (size) (list 'ALLOCATE-FRAME size)))
-  (set! FINISH (lambda () (list 'FINISH)))
-  )
+      (set! SHALLOW-ARGUMENT-REF (lambda (j) (list 'SHALLOW-ARGUMENT-REF j)))
+      (set! DEEP-ARGUMENT-REF (lambda (i j) (list 'DEEP-ARGUMENT-REF i j)))
+      (set! SET-DEEP-ARGUMENT! (lambda (i j) (list 'SET-DEEP-ARGUMENT! i j)))
+      (set! CHECKED-GLOBAL-REF (lambda (i) (list 'CHECKED-GLOBAL-REF i)))
+      (set! CONSTANT (lambda (v) (list 'CONSTANT v)))
+      (set! GOTO (lambda (offset) (list 'GOTO offset)))
+      (set! UNLINK-ENV (lambda () (list 'UNLINK-ENV)))
+      (set! INVOKE1 (lambda (address) (list 'INVOKE1 address)))
+      (set! POP-ARG1 (lambda () (list 'POP-ARG1)))
+      (set! POP-ARG2 (lambda () (list 'POP-ARG2)))
+      (set! CREATE-CLOSURE (lambda (offset) (list 'CREATE-CLOSURE offset)))
+      (set! RETURN (lambda () (list 'RETURN)))
+      (set! ARITY>=? (lambda (arity+1) (list 'ARITY>=? arity+1)))
+      (set! FUNCTION-INVOKE (lambda () (list 'FUNCTION-INVOKE)))
+      (set! RESTORE-ENV (lambda () (list 'RESTORE-ENV)))
+      (set! POP-CONS-FRAME! (lambda (arity) (list 'POP-CONS-FRAME! arity)))
+      (set! ALLOCATE-DOTTED-FRAME (lambda (arity) (list 'ALLOCATE-DOTTED-FRAME arity)))
+      (set! PREDEFINED (lambda (i) (list 'PREDEFINED i)))
+      (set! SET-SHALLOW-ARGUMENT! (lambda (j) (list 'SET-SHALLOW-ARGUMENT! j)))
+      (set! GLOBAL-REF (lambda (i) (list 'GLOBAL-REF i)))
+      (set! SET-GLOBAL! (lambda (i) (list 'SET-GLOBAL! i)))
+      (set! JUMP-FALSE (lambda (offset) (list 'JUMP-FALSE offset)))
+      (set! EXTEND-ENV (lambda () (list 'EXTEND-ENV)))
+      (set! CALL0 (lambda (address) (list 'CALL0 address)))
+      (set! PUSH-VALUE (lambda () (list 'PUSH-VALUE)))
+      (set! INVOKE2 (lambda (address) (list 'INVOKE2 address)))
+      (set! INVOKE3 (lambda (address) (list 'INVOKE3 address)))
+      (set! ARITY=? (lambda (arity+1) (list 'ARITY=? arity+1)))
+      (set! PACK-FRAME! (lambda (arity) (list 'PACK-FRAME! arity)))
+      (set! POP-FUNCTION (lambda () (list 'POP-FUNCTION)))
+      (set! PRESERVE-ENV (lambda () (list 'PRESERVE-ENV)))
+      (set! POP-FRAME! (lambda (rank) (list 'POP-FRAME! rank)))
+      (set! ALLOCATE-FRAME (lambda (size) (list 'ALLOCATE-FRAME size)))
+      (set! FINISH (lambda () (list 'FINISH)))
+)
 ;;;--------------------------------------------
 
 
 ;;;--------------opcode provider----------------------
+#|
 (define (check-byte j)
   (or (and (<= 0 j) (<= j 255))
       (static-wrong "Cannot pack this number within a byte" j) ) )
@@ -673,9 +697,11 @@
             ((0 1 2 3 4) (list (+ 50 size)))
             (else        (list 55 (+ size 1))))))
   )
+|#
 ;;;-----------------------------------------
 
 ;;;---------------interpret provider-------------
+#|
 (define *val* 'wait)
 (define *env* '())
 (define *pc* '())
@@ -851,3 +877,4 @@
   (set! FINISH (lambda ()
                  (list (lambda () (*exit* *val*)))))
   )
+|#
