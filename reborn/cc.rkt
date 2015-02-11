@@ -132,7 +132,7 @@
                        (let ((desc (get-description e)))
                          (and desc
                               (eq? 'function (car desc))
-                              (or (= (length (cddr desc)) (length e*))
+                              (or (= (caddr desc) (length e*))
                                   (static-wrong 
                                    "Incorrect arity for primitive" e )))))))
            (meaning-primitive-application e e* r tail?))
@@ -342,47 +342,13 @@
           (else (static-wrong "Wrong redefinition" name)) )
         (let ((index (g.init-extend! name)))
           (vector-set! sg.init index value) ) ) )
-  name )
+  name)
 
-(define-syntax definitial
-  (syntax-rules ()
-    ((definitial name value)
-     (g.init-initialize! 'name value) ) ) )
-
-(define-syntax defprimitive
-  (syntax-rules ()
-    ((defprimitive name value 0)
-     (defprimitive0 name value) )
-    ((defprimitive name value 1)
-     (defprimitive1 name value) )
-    ((defprimitive name value 2)
-     (defprimitive2 name value) )
-    ((defprimitive name value 3)
-     (defprimitive3 name value) ) ) )  
-
-(define-syntax defprimitive0
-  (syntax-rules ()
-    ((defprimitive0 name value)
-     (definitial name
-       (begin
-         (description-extend! 'name `(function value))
-         (lambda (v) name))))))
-
-(define-syntax defprimitive1
-  (syntax-rules ()
-    ((defprimitive1 name value)
-     (definitial name
-       (begin
-         (description-extend! 'name `(function value a))
-         (lambda (v) name))))))
-
-(define-syntax defprimitive2
-  (syntax-rules ()
-    ((defprimitive2 name value)
-     (definitial name
-       (begin
-         (description-extend! 'name `(function value a b))
-         (lambda (v) name))))))
+(define defprimitive
+  (lambda (name value num)
+    (begin
+      (g.init-extend! name)
+      (description-extend! name `(function ,name ,num)))))
 
 (define (get-description name)
   (let ((p (assq name desc.init)))
@@ -390,8 +356,7 @@
 
 (define (description-extend! name description)
   (set! desc.init 
-        (cons (cons name description) desc.init) )
-  name )
+        (cons (cons name description) desc.init)))
 
 (define ALTERNATIVE
   (lambda (m1 m2 m3)
@@ -476,10 +441,6 @@
 (define g.init '())
 (define desc.init '())
 
-(definitial t #t)
-(definitial f #f)
-(definitial nil '())
-
 ;;;oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 ;;; Describe a predefined value.
 ;;; The description language only represents primitives with their arity:
@@ -489,30 +450,30 @@
 ;;; names of the variables). ADDRESS is the address of the primitive
 ;;; to use when inlining an invokation to it. This address is
 ;;; represented by a Scheme procedure.
-(defprimitive cons cons 2)
-(defprimitive car car 1)
-(defprimitive cdr cdr 1)
-(defprimitive pair? pair? 1)
-(defprimitive symbol? symbol? 1)
-(defprimitive eq? eq? 2)
+(defprimitive 'cons cons 2)
+(defprimitive 'car car 1)
+(defprimitive 'cdr cdr 1)
+(defprimitive 'pair? pair? 1)
+(defprimitive 'symbol? symbol? 1)
+(defprimitive 'eq? eq? 2)
 ;;(defprimitive set-car! set-car! 2)
 ;;(defprimitive set-cdr! set-cdr! 2)
-(defprimitive + + 2)
-(defprimitive - - 2)
-(defprimitive = = 2)
-(defprimitive < < 2)
-(defprimitive > > 2)
-(defprimitive * * 2)
-(defprimitive <= <= 2)
-(defprimitive >= >= 2)
-(defprimitive remainder remainder 2)
-(defprimitive display display 1)
-(defprimitive read read 0)
-(defprimitive primitive? primitive? 1)
-(defprimitive continuation? continuation? 1)
-(defprimitive null? null? 1)
-(defprimitive newline newline 0)
-(defprimitive eof-object? eof-object? 1)
+(defprimitive '+ + 2)
+(defprimitive '- - 2)
+(defprimitive '= = 2)
+(defprimitive '< < 2)
+(defprimitive '> > 2)
+(defprimitive '* * 2)
+(defprimitive '<= <= 2)
+(defprimitive '>= >= 2)
+(defprimitive 'remainder remainder 2)
+(defprimitive 'display display 1)
+(defprimitive 'read read 0)
+(defprimitive 'primitive? primitive? 1)
+(defprimitive 'continuation? continuation? 1)
+(defprimitive 'null? null? 1)
+(defprimitive 'newline newline 0)
+(defprimitive 'eof-object? eof-object? 1)
 ;;;------------------------------------------------
 
 ;;;---------------------interface---------------------
@@ -918,4 +879,4 @@
     (let ((result (meaning e '() #t)))
       (if (null? *defined*)
           result
-          *defined*))))
+          (static-wrong "undefined" *defined*)))))
