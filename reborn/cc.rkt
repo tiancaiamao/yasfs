@@ -12,6 +12,8 @@
           ((if)     (meaning-alternative (cadr e) (caddr e) (cadddr e) r tail?))
           ((begin)  (meaning-sequence (cdr e) r tail?))
           ((set!)   (meaning-assignment (cadr e) (caddr e) r tail?))
+          ((define) (meaning-define (cadr e) (caddr e) r tail?))
+          ((let)    (meaning-let (cadr e) (caddr e) r tail?))
           (else     (meaning-application (car e) (cdr e) r tail?))))))
 
 (define meaning-reference
@@ -31,7 +33,9 @@
             ((predefined)
              (let ((i (cdr kind)))
                (PREDEFINED i) ) ) )
-          (static-wrong "No such variable" n)))))
+          (CHECKED-GLOBAL-REF (adjoint n))))))
+
+;;          (static-wrong "No such variable" n)))))
 
 (define meaning-quotation
   (lambda (v r tail?)
@@ -62,6 +66,17 @@
             ((predefined)
              (static-wrong "Immutable predefined variable" n)))
           (static-wrong "No such variable" n)))))
+
+(define meaning-define
+  (lambda (n e r tail?)
+    (if (global-variable? g.current n)
+        (if (memq n *defined*)
+            (begin
+              (set! *defined* (filter (lambda (v) (not (eq? v n))) *defined*))
+              (meaning-assignment n e r tail?))
+            (static-wrong "Cannot redefine variable" n))
+        (begin (g.current-extend! n)
+               (meaning-assignment n e r tail?)))))
 
 (define meaning-sequence
   (lambda (e+ r tail?)
@@ -154,6 +169,12 @@
            (m+ (meaning-sequence body r2 tail?)))
       (if tail? (TR-FIX-LET m* m+) 
           (FIX-LET m* m+)))))
+
+(define meaning-let
+  (lambda (bind body r tail?)
+    (let ((n* (map car bind))
+          (e* (map cadr bind)))
+      (meaning-fix-closed-application n* body e* r tail?))))
 
 (define meaning-dotted-closed-application
   (lambda (n* n body e* r tail?)
@@ -255,6 +276,12 @@
       (global-variable? g.current n)
       (global-variable? g.init n)))
 
+(define *defined* '())
+(define adjoint
+  (lambda (n)
+    (set! *defined* (cons n *defined*))
+    (g.current-extend! n)))
+
 (define (r-extend* r n*)
   (cons n* r) )
 
@@ -287,6 +314,7 @@
 (define (global-update! i v)
   (vector-set! sg.current i v) )
 
+#|
 (define (g.current-initialize! name)
   (let ((kind (compute-kind r.init name)))
     (if kind
@@ -297,6 +325,7 @@
         (let ((index (g.current-extend! name)))
           (vector-set! sg.current index 'undefined-value) ) ) )
   name )
+|#
 
 (define (g.init-extend! n)
   (let ((level (length g.init)))
@@ -878,3 +907,15 @@
                  (list (lambda () (*exit* *val*)))))
   )
 |#
+
+;;--------------------------begin------------------------------
+
+(begin 
+  (assemble-provider)
+  (define (compile e)
+    (set! *defined* '())
+    (set! g.current '())
+    (let ((result (meaning e '() #t)))
+      (if (null? *defined*)
+          result
+          *defined*))))
