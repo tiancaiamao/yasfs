@@ -13,7 +13,7 @@
           ((begin)  (meaning-sequence (cdr e) r tail?))
           ((set!)   (meaning-assignment (cadr e) (caddr e) r tail?))
           ((define) (meaning-define (cadr e) (caddr e) r tail?))
-          ((let)    (meaning-let (cadr e) (caddr e) r tail?))
+          ((let)    (meaning (rewrite-let (cdr e)) r tail?))
           ((cond)   (meaning (rewrite-cond (cdr e)) r tail?))
           (else     (meaning-application (car e) (cdr e) r tail?))))))
 
@@ -171,12 +171,6 @@
       (if tail? (TR-FIX-LET m* m+) 
           (FIX-LET m* m+)))))
 
-(define meaning-let
-  (lambda (bind body r tail?)
-    (let ((n* (map car bind))
-          (e* (map cadr bind)))
-      (meaning-fix-closed-application n* body e* r tail?))))
-
 (define meaning-dotted-closed-application
   (lambda (n* n body e* r tail?)
     (let* ((m* (meaning-dotted* e* r (length e*) (length n*) #f))
@@ -274,7 +268,47 @@
                `(if ,(caar e*) ,(cadar e*) #f)))
           (else 
            `(if ,(caar e*) ,(cadar e*) ,(rewrite-cond (cdr e*)))))))
-    
+
+(define rewrite-let
+  (lambda (e)    
+    (if (pair? (car e))
+        (rewrite-let-normal (car e) (cadr e))
+        (rewrite-let-loop (car e) (cadr e) (caddr e)))))
+
+(define rewrite-let-normal
+  (lambda (bind body)
+    (let ((n* (map car bind))
+          (e* (map cadr bind)))
+      `((lambda ,n*
+          ,body) ,@e*))))
+
+(define rewrite-let-loop
+  (lambda (name bind body)
+    (let ((n* (map car bind))
+         (e* (map cadr bind)))
+      `((,(case (length n*)
+            ((1) 'Y1)
+            ((2) 'Y2)
+            ((3) 'Y3))
+         (lambda (,name)
+           (lambda ,n*
+             ,body)))
+        ,@e*))))
+
+(define Y1
+    (lambda (F)
+      ((lambda (u) (u u))
+       (lambda (x) (F (lambda (v) ((x x) v)))))))
+
+(define Y2
+    (lambda (F)
+      ((lambda (u) (u u))
+       (lambda (x) (F (lambda (v1 v2) ((x x) v1 v2)))))))
+
+(define Y3
+    (lambda (F)
+      ((lambda (u) (u u))
+       (lambda (x) (F (lambda (v1 v2 v3) ((x x) v1 v2 v3)))))))
 
 ;;; Determine the nature of a variable.
 ;;; Three different answers. Or the variable is local (ie appears in R)
@@ -486,6 +520,9 @@
 (defprimitive 'null? null? 1)
 (defprimitive 'newline newline 0)
 (defprimitive 'eof-object? eof-object? 1)
+(defprimitive 'Y1 Y1 1)
+(defprimitive 'Y2 Y2 1)
+(defprimitive 'Y3 Y3 1)
 ;;;------------------------------------------------
 
 ;;;---------------------interface---------------------
