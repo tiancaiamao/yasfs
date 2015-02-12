@@ -14,6 +14,7 @@
           ((set!)   (meaning-assignment (cadr e) (caddr e) r tail?))
           ((define) (meaning-define (cadr e) (caddr e) r tail?))
           ((let)    (meaning-let (cadr e) (caddr e) r tail?))
+          ((cond)   (meaning (rewrite-cond (cdr e)) r tail?))
           (else     (meaning-application (car e) (cdr e) r tail?))))))
 
 (define meaning-reference
@@ -263,6 +264,17 @@
   (display msg)
   (display v)
   (newline))
+
+(define rewrite-cond
+  (lambda (e*)
+    (cond ((null? e*) (static-wrong "bad syntax in" "cond"))
+          ((null? (cdr e*))
+           (if (eq? (caar e*) 'else)
+               (cadar e*)
+               `(if ,(caar e*) ,(cadar e*) #f)))
+          (else 
+           `(if ,(caar e*) ,(cadar e*) ,(rewrite-cond (cdr e*)))))))
+    
 
 ;;; Determine the nature of a variable.
 ;;; Three different answers. Or the variable is local (ie appears in R)
