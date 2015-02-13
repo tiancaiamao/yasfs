@@ -15,7 +15,7 @@
             ((eq? syntax 'set!)   (meaning-assignment (cadr e) (caddr e) r tail?))
             ((eq? syntax 'define) (meaning-define (cadr e) (caddr e) r tail?))
             ((eq? syntax 'let)    (meaning (rewrite-let (cdr e)) r tail?))
-            ((eq? syntax 'let*)   (meaning (rewrite-let* (reverse (cdr e))) r tail?))
+            ((eq? syntax 'let*)   (meaning (rewrite-let* (reverse (cadr e)) (caddr e)) r tail?))
             ((eq? syntax 'cond)   (meaning (rewrite-cond (cdr e)) r tail?))
             (else     (meaning-application syntax (cdr e) r tail?)))))))
 
