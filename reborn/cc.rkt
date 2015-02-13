@@ -5,33 +5,34 @@
   (lambda (e r tail?)
     (if (atom? e)
         (if (symbol? e) (meaning-reference e r tail?)
-            (meaning-quotation e r tail?) )
-        (case (car e)
-          ((quote)  (meaning-quotation (cadr e) r tail?))
-          ((lambda) (meaning-abstraction (cadr e) (cddr e) r tail?))
-          ((if)     (meaning-alternative (cadr e) (caddr e) (cadddr e) r tail?))
-          ((begin)  (meaning-sequence (cdr e) r tail?))
-          ((set!)   (meaning-assignment (cadr e) (caddr e) r tail?))
-          ((define) (meaning-define (cadr e) (caddr e) r tail?))
-          ((let)    (meaning (rewrite-let (cdr e)) r tail?))
-          ((cond)   (meaning (rewrite-cond (cdr e)) r tail?))
-          (else     (meaning-application (car e) (cdr e) r tail?))))))
+            (meaning-quotation e r tail?))
+        (let ((syntax (car e)))
+          (cond
+            ((eq? syntax 'quote)  (meaning-quotation (cadr e) r tail?))
+            ((eq? syntax 'lambda) (meaning-abstraction (cadr e) (cddr e) r tail?))
+            ((eq? syntax 'if)     (meaning-alternative (cadr e) (caddr e) (cadddr e) r tail?))
+            ((eq? syntax 'begin)  (meaning-sequence (cdr e) r tail?))
+            ((eq? syntax 'set!)   (meaning-assignment (cadr e) (caddr e) r tail?))
+            ((eq? syntax 'define) (meaning-define (cadr e) (caddr e) r tail?))
+            ((eq? syntax 'let)    (meaning (rewrite-let (cdr e)) r tail?))
+            ((eq? syntax 'cond)   (meaning (rewrite-cond (cdr e)) r tail?))
+            (else     (meaning-application syntax (cdr e) r tail?)))))))
 
 (define meaning-reference
   (lambda (n r tail?)
     (let ((kind (compute-kind r n)))
       (if kind
-          (case (car kind)
-            ((local)
+          (cond
+            ((eq? (car kind) 'local)
              (let ((i (cadr kind))
                    (j (cddr kind)) )
                (if (= i 0)
                    (SHALLOW-ARGUMENT-REF j)
                    (DEEP-ARGUMENT-REF i j) ) ) )
-            ((global)
+            ((eq? (car kind) 'global)
              (let ((i (cdr kind)))
                (CHECKED-GLOBAL-REF i) ) )
-            ((predefined)
+            ((eq? (car kind) 'predefined)
              (let ((i (cdr kind)))
                (PREDEFINED i) ) ) )
           (CHECKED-GLOBAL-REF (adjoint n))))))
@@ -54,17 +55,17 @@
     (let ((m (meaning e r #f))
           (kind (compute-kind r n)))
       (if kind
-          (case (car kind)
-            ((local)
+          (cond
+            ((eq? (car kind) 'local)
              (let ((i (cadr kind))
                    (j (cddr kind)) )
                (if (= i 0)
                    (SHALLOW-ARGUMENT-SET! j m)
                    (DEEP-ARGUMENT-SET! i j m))))
-            ((global)
+            ((eq? (car kind) 'global)
              (let ((i (cdr kind)))
                (GLOBAL-SET! i m)))
-            ((predefined)
+            ((eq? (car kind) 'predefined)
              (static-wrong "Immutable predefined variable" n)))
           (static-wrong "No such variable" n)))))
 
@@ -188,21 +189,21 @@
            ;; desc = (function address . variables-list)
            (address (cadr desc))
            (size (length e*)) )
-      (case size
-        ((0) (CALL0 address))
-        ((1) 
+      (cond
+        ((eq? size 0) (CALL0 address))
+        ((eq? size 1)
          (let ((m1 (meaning (car e*) r #f)))
            (CALL1 address m1) ) )
-        ((2) 
+        ((eq? size 2)
          (let ((m1 (meaning (car e*) r #f))
                (m2 (meaning (cadr e*) r #f)) )
            (CALL2 address m1 m2) ) )
-        ((3) 
+        ((eq? size 3)
          (let ((m1 (meaning (car e*) r #f))
                (m2 (meaning (cadr e*) r #f))
                (m3 (meaning (caddr e*) r #f)) )
            (CALL3 address m1 m2 m3) ) )
-        (else (meaning-regular-application e e* r tail?)) ) ) ))
+        (else (meaning-regular-application e e* r tail?))))))
 
 ;;; In a regular application, the invocation protocol is to call the
 ;;; function with an activation frame and a continuation: (f v* k).
@@ -379,6 +380,7 @@
           (cons (cons n `(predefined . ,level)) g.init))
     level ))
 
+#|
 (define (g.init-initialize! name value)
   (let ((kind (compute-kind r.init name)))
     (if kind
@@ -389,6 +391,7 @@
         (let ((index (g.init-extend! name)))
           (vector-set! sg.init index value) ) ) )
   name)
+|#
 
 (define defprimitive
   (lambda (name value num)
