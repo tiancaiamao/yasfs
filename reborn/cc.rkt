@@ -15,6 +15,7 @@
             ((eq? syntax 'set!)   (meaning-assignment (cadr e) (caddr e) r tail?))
             ((eq? syntax 'define) (meaning-define (cadr e) (caddr e) r tail?))
             ((eq? syntax 'let)    (meaning (rewrite-let (cdr e)) r tail?))
+            ((eq? syntax 'let*)   (meaning (rewrite-let* (reverse (cdr e))) r tail?))
             ((eq? syntax 'cond)   (meaning (rewrite-cond (cdr e)) r tail?))
             (else     (meaning-application syntax (cdr e) r tail?)))))))
 
@@ -111,12 +112,10 @@
 
 (define meaning-fix-abstraction
   (lambda (n* e+ r tail?)
-    ((lambda (arity r2 m+)
-       (set! arity (length n*))
-       (set! r2 (r-extend* r n*))
-       (set! m+ (meaning-sequence e+ r2 #t))
-       (FIX-CLOSURE m+ arity))
-     'ig 'ig 'ig)))
+    (let* ((arity (length n*))
+           (r2 (r-extend* r n*))
+           (m+ (meaning-sequence e+ r2 #t)))
+      (FIX-CLOSURE m+ arity))))
 
 (define meaning-dotted-abstraction
   (lambda (n* n e+ r tail?)
@@ -296,6 +295,15 @@
              ,body)))
         ,@e*))))
 
+(define rewrite-let*
+  (lambda (rbind body)
+    (if (null? rbind)
+        body
+        (rewrite-let* (cdr rbind)
+                      `((lambda (,(caar rbind))
+                          ,body)
+                        ,(cadar rbind))))))
+      
 (define Y1
     (lambda (F)
       ((lambda (u) (u u))
