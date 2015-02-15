@@ -38,8 +38,6 @@
                (PREDEFINED i) ) ) )
           (CHECKED-GLOBAL-REF (adjoint n))))))
 
-;;          (static-wrong "No such variable" n)))))
-
 (define meaning-quotation
   (lambda (v r tail?)
     (CONSTANT v)))
@@ -154,7 +152,7 @@
           ((pair? n*) 
            (if (pair? e*)
                (parse (cdr n*) (cdr e*) (cons (car n*) regular))
-               (static-wrong "Too less arguments" e ee*) ) )
+               (static-wrong "Too less arguments" e)))
           ((null? n*)
            (if (null? e*)
                (meaning-fix-closed-application 
@@ -204,8 +202,6 @@
            (CALL3 address m1 m2 m3) ) )
         (else (meaning-regular-application e e* r tail?))))))
 
-;;; In a regular application, the invocation protocol is to call the
-;;; function with an activation frame and a continuation: (f v* k).
 (define meaning-regular-application
   (lambda (e e* r tail?)
     (let* ((m (meaning e r #f))
@@ -254,7 +250,7 @@
   (lambda (v)
     (not (pair? v))))
 
-(define (static-wrong msg v)
+(define (static-wrong msg . v)
   (display msg)
   (display v)
   (newline))
@@ -265,12 +261,12 @@
           ((null? (cdr e*))
            (if (eq? (caar e*) 'else)
                (cadar e*)
-               `(if ,(caar e*) ,(cadar e*) #f)))
+               (list 'if (caar e*) (cadar e*) #f)))
           (else 
-           `(if ,(caar e*) ,(cadar e*) ,(rewrite-cond (cdr e*)))))))
+           (list 'if (caar e*) (cadar e*) (rewrite-cond (cdr e*)))))))
 
 (define rewrite-let
-  (lambda (e)    
+  (lambda (e)
     (if (pair? (car e))
         (rewrite-let-normal (car e) (cadr e))
         (rewrite-let-loop (car e) (cadr e) (caddr e)))))
@@ -279,8 +275,8 @@
   (lambda (bind body)
     (let ((n* (map car bind))
           (e* (map cadr bind)))
-      `((lambda ,n*
-          ,body) ,@e*))))
+      (cons (list 'lambda n*
+                  body) e*))))
 
 (define rewrite-let-loop
   (lambda (name bind body)
@@ -300,9 +296,7 @@
     (if (null? rbind)
         body
         (rewrite-let* (cdr rbind)
-                      `((lambda (,(caar rbind))
-                          ,body)
-                        ,(cadar rbind))))))
+                      (list (list 'lambda (list (caar rbind)) body) (cadar rbind))))))
       
 (define Y1
     (lambda (F)
@@ -346,16 +340,16 @@
                   (j 0) )
          (cond ((pair? names) 
                 (if (eq? n (car names))
-                    `(local ,i . ,j)
+                    (list 'local (cons i j))
                     (scan (cdr names) (+ 1 j)) ) )
                ((null? names)
                 (local-variable? (cdr r) (+ i 1) n) )
-               ((eq? n names) `(local ,i . ,j)) ) ) ) )
+               ((eq? n names) (list ('local (cons i j))))))))
 
 (define (g.current-extend! n)
   (let ((level (length g.current)))
     (set! g.current 
-          (cons (cons n `(global . ,level)) g.current))
+          (cons (cons n (cons 'global level)) g.current))
     level))
 
 (define (global-variable? g n)
@@ -385,7 +379,7 @@
 (define (g.init-extend! n)
   (let ((level (length g.init)))
     (set! g.init
-          (cons (cons n `(predefined . ,level)) g.init))
+          (cons (cons n (cons 'predefined level)) g.init))
     level ))
 
 #|
@@ -405,7 +399,7 @@
   (lambda (name value num)
     (begin
       (g.init-extend! name)
-      (description-extend! name `(function ,name ,num)))))
+      (description-extend! name (list 'function name num)))))
 
 (define (get-description name)
   (let ((p (assq name desc.init)))
