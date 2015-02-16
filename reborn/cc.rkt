@@ -250,10 +250,11 @@
   (lambda (v)
     (not (pair? v))))
 
-(define (static-wrong msg . v)
-  (display msg)
-  (display v)
-  (newline))
+(define static-wrong 
+  (lambda (msg v)
+    (display msg)
+    (display v)
+    (newline)))
 
 (define rewrite-cond
   (lambda (e*)
@@ -281,15 +282,15 @@
 (define rewrite-let-loop
   (lambda (name bind body)
     (let ((n* (map car bind))
-         (e* (map cadr bind)))
-      `((,(case (length n*)
-            ((1) 'Y1)
-            ((2) 'Y2)
-            ((3) 'Y3))
-         (lambda (,name)
-           (lambda ,n*
-             ,body)))
-        ,@e*))))
+          (e* (map cadr bind)))
+      (cons (list (cond
+                    ((eq? (length n*) 1) 'Y1)
+                    ((eq? (length n*) 2) 'Y2)
+                    ((eq? (length n*) 3) 'Y3))
+                  (list 'lambda (list name)
+                        (list 'lambda n*
+                              body)))
+            e*))))
 
 (define rewrite-let*
   (lambda (rbind body)
@@ -313,17 +314,11 @@
       ((lambda (u) (u u))
        (lambda (x) (F (lambda (v1 v2 v3) ((x x) v1 v2 v3)))))))
 
-;;; Determine the nature of a variable.
-;;; Three different answers. Or the variable is local (ie appears in R)
-;;; then return     (LOCAL index . depth)
-;;; global (ie created by the user) then return
-;;;                 (GLOBAL . index)
-;;; or predefined (and immutable) then return
-;;;                 (PREDEFINED . index)
-(define (compute-kind r n)
-  (or (local-variable? r 0 n)
-      (global-variable? g.current n)
-      (global-variable? g.init n)))
+(define compute-kind
+  (lambda (r n)
+    (or (local-variable? r 0 n)
+        (global-variable? g.current n)
+        (global-variable? g.init n))))
 
 (define *defined* '())
 (define adjoint
@@ -331,69 +326,50 @@
     (set! *defined* (cons n *defined*))
     (g.current-extend! n)))
 
-(define (r-extend* r n*)
-  (cons n* r) )
+(define r-extend* 
+  (lambda (r n*)
+    (cons n* r)))
 
-(define (local-variable? r i n)
-  (and (pair? r)
-       (let scan ((names (car r))
-                  (j 0) )
-         (cond ((pair? names) 
-                (if (eq? n (car names))
-                    (list 'local (cons i j))
-                    (scan (cdr names) (+ 1 j)) ) )
-               ((null? names)
-                (local-variable? (cdr r) (+ i 1) n) )
-               ((eq? n names) (list ('local (cons i j))))))))
+(define local-variable? 
+  (lambda (r i n)
+    (and (pair? r)
+         (let scan ((names (car r))
+                    (j 0) )
+           (cond ((pair? names) 
+                  (if (eq? n (car names))
+                      (cons 'local (cons i j))
+                      (scan (cdr names) (+ 1 j)) ) )
+                 ((null? names)
+                  (local-variable? (cdr r) (+ i 1) n) )
+                 ((eq? n names) (cons 'local (cons i j))))))))
 
-(define (g.current-extend! n)
-  (let ((level (length g.current)))
-    (set! g.current 
-          (cons (cons n (cons 'global level)) g.current))
-    level))
+(define g.current-extend! 
+  (lambda (n)
+    (let ((level (length g.current)))
+      (set! g.current 
+            (cons (cons n (cons 'global level)) g.current))
+      level)))
 
-(define (global-variable? g n)
-  (let ((var (assq n g)))
-    (and (pair? var)
-         (cdr var) ) ) )
+(define global-variable? 
+  (lambda (g n)
+    (let ((var (assq n g)))
+      (and (pair? var)
+           (cdr var) ) ) ))
 
-(define (global-fetch i)
-  (vector-ref sg.current i) )
+(define global-fetch 
+  (lambda (i)
+    (vector-ref sg.current i) ))
 
-(define (global-update! i v)
-  (vector-set! sg.current i v) )
+(define global-update! 
+  (lambda (i v)
+    (vector-set! sg.current i v) ))
 
-#|
-(define (g.current-initialize! name)
-  (let ((kind (compute-kind r.init name)))
-    (if kind
-        (case (car kind)
-          ((global)
-           (vector-set! sg.current (cdr kind) 'undefined-value) )
-          (else (static-wrong "Wrong redefinition" name)) )
-        (let ((index (g.current-extend! name)))
-          (vector-set! sg.current index 'undefined-value) ) ) )
-  name )
-|#
-
-(define (g.init-extend! n)
-  (let ((level (length g.init)))
-    (set! g.init
-          (cons (cons n (cons 'predefined level)) g.init))
-    level ))
-
-#|
-(define (g.init-initialize! name value)
-  (let ((kind (compute-kind r.init name)))
-    (if kind
-        (case (car kind)
-          ((predefined)
-           (vector-set! sg.init (cdr kind) value) )
-          (else (static-wrong "Wrong redefinition" name)) )
-        (let ((index (g.init-extend! name)))
-          (vector-set! sg.init index value) ) ) )
-  name)
-|#
+(define g.init-extend! 
+  (lambda (n)
+    (let ((level (length g.init)))
+      (set! g.init
+            (cons (cons n (cons 'predefined level)) g.init))
+      level )))
 
 (define defprimitive
   (lambda (name value num)
@@ -401,13 +377,15 @@
       (g.init-extend! name)
       (description-extend! name (list 'function name num)))))
 
-(define (get-description name)
-  (let ((p (assq name desc.init)))
-    (and (pair? p) (cdr p)) ) )
+(define get-description 
+  (lambda (name)
+    (let ((p (assq name desc.init)))
+      (and (pair? p) (cdr p)) ) ))
 
-(define (description-extend! name description)
-  (set! desc.init 
-        (cons (cons name description) desc.init)))
+(define description-extend! 
+  (lambda (name description)
+    (set! desc.init 
+          (cons (cons name description) desc.init))))
 
 (define ALTERNATIVE
   (lambda (m1 m2 m3)
@@ -528,6 +506,12 @@
 (defprimitive 'Y1 Y1 1)
 (defprimitive 'Y2 Y2 1)
 (defprimitive 'Y3 Y3 1)
+(defprimitive 'make-vector make-vector 1)
+(defprimitive 'vector-set! vector-set! 3)
+(defprimitive 'vector-ref vector-ref 2)
+(defprimitive 'not not 1)
+(defprimitive 'atom? atom? 1)
+
 ;;;------------------------------------------------
 
 ;;;---------------------interface---------------------
@@ -567,7 +551,7 @@
 (define (FINISH) 'wait)
 
 ;;;----------------------assemble provider-------------------
-(define (assemble-provider)
+(define assemble-provider (lambda ()
       (set! SHALLOW-ARGUMENT-REF (lambda (j) (list 'SHALLOW-ARGUMENT-REF j)))
       (set! DEEP-ARGUMENT-REF (lambda (i j) (list 'DEEP-ARGUMENT-REF i j)))
       (set! SET-DEEP-ARGUMENT! (lambda (i j) (list 'SET-DEEP-ARGUMENT! i j)))
@@ -602,7 +586,7 @@
       (set! POP-FRAME! (lambda (rank) (list 'POP-FRAME! rank)))
       (set! ALLOCATE-FRAME (lambda (size) (list 'ALLOCATE-FRAME size)))
       (set! FINISH (lambda () (list 'FINISH)))
-)
+))
 ;;;--------------------------------------------
 
 
