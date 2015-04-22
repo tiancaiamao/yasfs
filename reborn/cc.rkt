@@ -250,6 +250,86 @@
   (lambda (v)
     (not (pair? v))))
 
+(define list
+  (lambda (a . b)
+    (cons a b)))
+
+(define myappend1
+  (lambda (a b)
+    (if (null? a)
+        b
+        (cons (car a) (myappend1 (cdr a) b)))))
+
+(define myappend2
+  (lambda (a b)
+    (cond
+      ((null? b) a)
+      ((null? (cdr b)) 
+       (myappend1 a (car b)))
+      (else
+       (myappend1 a (myappend2 (car b) (cdr b)))))))
+
+(define append
+  (lambda (a . b)
+    (myappend2 a b)))
+
+(define length
+  (lambda (ls)
+    (if (null? ls)
+        0
+        (+ 1 (length (cdr ls))))))
+
+(define filter
+  (lambda (fn ls)
+    (if (null? ls)
+        '()
+        (let ((v (car ls)))
+          (if (fn v)
+              (cons v (filter fn (cdr ls)))
+              (filter fn (cdr ls)))))))
+
+(define map
+  (lambda (fn ls)
+    (if (null? ls)
+        '()
+        (cons 
+         (fn (car ls)) 
+         (map fn (cdr ls))))))
+
+(define memq
+  (lambda (s ls)
+    (cond
+      ((null? ls) #f)
+      ((eq? (car ls) s) ls)
+      (else
+       (memq s (cdr ls))))))
+
+#|
+(define assq
+  (lambda (s ls)
+    (cond
+      ((null? ls) #f)
+      ((eq? (caar ls) s) ls)
+      (else
+       (assq s (cdr ls))))))
+|#
+
+(define cddr (lambda (ls) (cdr (cdr ls))))
+(define caar (lambda (ls) (car (car ls))))
+(define caddr (lambda (ls) (car (cdr (cdr ls)))))
+(define cadr (lambda (ls) (car (cdr ls))))
+(define cadar (lambda (ls) (car (cdr (car ls)))))
+
+(define reverse2
+  (lambda (ls ret)
+    (if (null? ls)
+        ret
+        (reverse2 (cdr ls) (cons (car ls) ret)))))
+         
+(define reverse
+  (lambda (ls)
+    (reverse2 ls '())))
+
 (define static-wrong 
   (lambda (msg v)
     (display msg)
@@ -469,7 +549,6 @@
 (define g.current '())
 (define g.init '())
 (define desc.init '())
-
 ;;;oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 ;;; Describe a predefined value.
 ;;; The description language only represents primitives with their arity:
@@ -551,7 +630,7 @@
 (define (FINISH) 'wait)
 
 ;;;----------------------assemble provider-------------------
-(define assemble-provider (lambda ()
+(define (assemble-provider)
       (set! SHALLOW-ARGUMENT-REF (lambda (j) (list 'SHALLOW-ARGUMENT-REF j)))
       (set! DEEP-ARGUMENT-REF (lambda (i j) (list 'DEEP-ARGUMENT-REF i j)))
       (set! SET-DEEP-ARGUMENT! (lambda (i j) (list 'SET-DEEP-ARGUMENT! i j)))
@@ -586,12 +665,11 @@
       (set! POP-FRAME! (lambda (rank) (list 'POP-FRAME! rank)))
       (set! ALLOCATE-FRAME (lambda (size) (list 'ALLOCATE-FRAME size)))
       (set! FINISH (lambda () (list 'FINISH)))
-))
+)
 ;;;--------------------------------------------
 
 
 ;;;--------------opcode provider----------------------
-#|
 (define (check-byte j)
   (or (and (<= 0 j) (<= j 255))
       (static-wrong "Cannot pack this number within a byte" j) ) )
@@ -725,7 +803,6 @@
             ((0 1 2 3 4) (list (+ 50 size)))
             (else        (list 55 (+ size 1))))))
   )
-|#
 ;;;-----------------------------------------
 
 ;;;---------------interpret provider-------------
@@ -909,12 +986,30 @@
 
 ;;--------------------------begin------------------------------
 
-(begin 
-  (assemble-provider)
-  (define (compile e)
-    (set! *defined* '())
-    (set! g.current '())
-    (let ((result (meaning e '() #t)))
-      (if (null? *defined*)
-          result
-          (static-wrong "undefined" *defined*)))))
+(define compiler-generator
+  (lambda (provider)
+    (provider)
+    (lambda (e)
+      (set! *defined* '())
+      (set! g.current '())
+      (let ((result (meaning e '() #t)))
+        (if (null? *defined*)
+            result
+            (static-wrong "undefined" *defined*))))))
+
+(define compile-debug
+  (compiler-generator assemble-provider))
+
+(define compile
+  (lambda (e)
+    (let ((cc (compiler-generator opcode-provider)))
+      (let ((code (cc e)))
+        (if (pair? code)
+            (list (list->vector code)
+                  (map (lambda (x)
+                         (cons (car x) (cddr x))) g.current))
+            code)))))
+            
+           
+      
+    

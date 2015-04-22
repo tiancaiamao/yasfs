@@ -1,3 +1,5 @@
+const char * program = "'(#(40 2 30 32 72 32 1 34 81 35 106 31 3 82 30 19 1 34 8 0 34 1 34 82 35 105 34 51 60 39 37 45 38 35 109 43 27 0 8 0 34 79 5 34 51 60 39 45) ((fact . 0)))";
+
 #include "sexp.h"
 #include <stdlib.h>
 
@@ -684,6 +686,9 @@ run(struct vm *vm, sexp code, sexp global) {
 			vm->pc += offset;			
 		}
 	}
+	
+	free(vm->code);
+	vm->code = NULL;
 	return 0;
 }
 
@@ -708,21 +713,34 @@ vm_init(struct vm *vm) {
 
 int
 main(int argc, char *argv[]) {
+	sexp ctx; // 要利用chibi里面的ctx做io等等操作
+	sexp input;
 	struct vm vm;
 	int succ;
 	sexp global;
 	sexp bytecode;
-	const char *str = "#(79 5 34 84 35 108 31 4 79 42 30 2 79 10 20)";
 	
-	global = sexp_make_vector(vm.ctx, SEXP_ONE, SEXP_ONE);
+	ctx = sexp_make_eval_context(NULL, NULL, NULL, 0, 0);
+
 	initialize();
 	vm_init(&vm);
-	bytecode = sexp_read_from_string(vm.ctx, str, -1);
+	
+	input = sexp_read_from_string(ctx, program, -1);
+	if (!sexp_pairp(input)) {
+		printf("wrong input");
+		return -1;
+	}
+	
+	bytecode = sexp_car(input);
+	global = sexp_cadr(input);
+	
 	succ = run(&vm, bytecode, global);
 	if (succ != 0) {
 		printf("失败了%d\n", succ);
 	} else {
 		printf("%ld", sexp_unbox_fixnum(vm.val));		
 	}
+	
+	sexp_destroy_context(ctx);
 	return 0;
 }
