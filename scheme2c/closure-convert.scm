@@ -1,3 +1,5 @@
+(define (prim? exp) (memq exp '(+ - * / =)))
+(define (const? x) (or (integer? x) (string? x) (boolean? x)))
 (define (tagged-list? e tag)
   (and (pair? e) (eq? (car e) tag)))
 
@@ -14,11 +16,46 @@
 (define (set!->var e) (cadr e))
 (define (set!->val e) (caddr e))
 
+(define (begin? e) (tagged-list? e 'begin))
+(define (begin->exp e) (cdr e))
+
+(define (app? e) (pair? e))
+
+(define remove
+  (lambda (x ls)
+    (cond
+     ((null? ls) '())
+     ((eq? x (car ls))
+      (remove x (cdr ls)))
+     (else 
+      (cons (car ls) (remove x (cdr ls)))))))
+
 (define difference
   (lambda (lst1 lst2)
     (if (not (pair? lst2))
 	lst1
 	(difference (remove (car lst2) lst1) (cdr lst2)))))
+
+(define insert
+  (lambda (x ls)
+    (cond
+     ((null? ls) (cons x '()))
+     ((eq? (car ls) x) ls)
+     (else (cons (car ls)
+		 (insert x (cdr ls)))))))
+
+(define union
+  (lambda (lst1 lst2)
+    (if (null? lst1)
+	lst2
+	(insert (car lst1)
+		(union (cdr lst1) lst2)))))
+
+(define reduce
+  (lambda (f ls rv)    
+    (if (null? ls)
+	rv
+	(reduce f (cdr ls) (f (car ls) rv)))))
 
 (define environments '())
 (define num-envs 0)
@@ -28,6 +65,74 @@
     (set! environments (cons (cons num-envs lst) environments))
     num-envs))
 
+(define free-vars
+  (lambda (exp)
+    (cond
+     ((const? exp) '())
+     ((prim? exp) '())
+     ((symbol? exp) (list exp))
+     ((lambda? exp) (difference (free-vars (lambda->body exp))
+				(lambda->bind exp)))
+     ((if? exp) (union (free-vars (if->test exp))
+		       (union (free-vars (if->then exp))
+			      (free-vars (if->else exp)))))
+     ((set!? exp) (union (list (set!->var exp))
+			 (free-vars (set!->val exp))))
+     ((begin? exp) (reduce union (map free-vars (begin->exp exp)) '()))
+     ((app? exp) (reduce union (map free-vars exp) '()))
+     (else (error "unknown expression:" exp)))))
+
+(define substitute-var
+  (lambda (env x)
+    (let ((sub (assq x env)))
+      (if sub
+	  (cadr sub)
+	  x))))
+
+(define assq-remove-key
+  (lambda (x env)
+    (cond 
+     ((null? env) '())
+     ((eq? (caar env) x) 
+      (assq-remove-key x (cdr env)))
+     (else (cons (car env)
+		 (assq-remove-key x (cdr env)))))))
+
+(define assq-remove-keys
+  (lambda (lst env)
+    (if (null? lst)
+	env
+	(assq-remove-keys (cdr lst)
+			  (assq-remove-key (car lst) env)))))
+
+(define substitute
+  (lambda (env exp)
+    (define substitute-with (lambda (e) (substitute env e)))
+    (cond
+     ((const? exp) exp)
+     ((symbol? exp)
+      (substitute-var env exp))
+     ((if? exp)
+      `(if ,(substitute-var env (if->test exp))
+	   ,(substitute-var env (if->then exp))
+	   ,(substitute-var env (if->else exp))))
+     ((begin? exp)
+      (cons 'begin (map substitute-with (begin->exp exp))))
+     ((set!? exp)
+      `(set! ,(substitute-var env (set!->var exp))
+	     ,(substitute-var env (set!->val exp))))
+     ((lambda? exp)
+      `(lambda ,(lambda->bind exp)
+	 ,(substitute (assq-remove-keys env (lambda->bind exp))
+		      (lambda->body exp))))
+     ((app? exp) (map substitute-with (begin->exp exp))))))
+
+(define (azip list1 list2)
+  (if (and (pair? list1) (pair? list2))
+      (cons (list (car list1) (car list2))
+            (azip (cdr list1) (cdr list2)))
+      '()))
+
 (define closure-convert
   (lambda (exp)
     (cond
@@ -35,7 +140,7 @@
       exp)
      ((lambda? exp) 
       (let* ((body (closure-convert (lambda->body exp)))
-	     (fv (difference (free-vars body) (lambda->bind exp)))
+	     (fv (difference (free-vars (lambda->body exp)) (lambda->bind exp)))
 	     (id (allocate-environment fv))
 	     ($env (gensym 'env))
 	     (sub (map (lambda (v)

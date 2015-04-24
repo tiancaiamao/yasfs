@@ -1,4 +1,4 @@
-(define (prim? x) (memq x '(+ - * /)))
+(define (prim? x) (memq x '(+ - * / = or and void)))
 (define (trivial? x) (or (number? x) (symbol? x) (string? x) (boolean? x)))
 (define (lambda? x) (and (pair? x) (eq? (car x) 'lambda)))
 (define (void) (begin))
@@ -27,16 +27,11 @@
 	   [`(set! ,var ,val)
 	    (T-k val
 		 (lambda (v)
-		   (T-c `(set!/k ,var ,v) c)))]
+		   `(set!/k ,var ,v ,c)))]
 	   [`(if ,test ,then ,else)
-	    (let ((k (gensym 'k$)))
-	      `((lambda (,k)
-		  ,(T-k test 
-			(lambda (test$)
-			  `(if ,test$
-			       ,(T-c then k)
-			       ,(T-c else k)))))
-		,c))]
+	    (T-k exp
+		 (lambda (v)
+		   `(,c ,v)))]
 	   [(f es ...)
 	    (if (prim? f)
 		(T*-k es
@@ -71,14 +66,16 @@
 	   [('begin e es ...)
 	    (T-k e (lambda (_)
 		     (T-k `(begin ,@es) k)))]
-	   [`(if ,test ,then ,else)
+	   [`(set! ,var ,val)
 	    (let* ((rv (gensym 'rv$))
-		   (cont `(lambda (,rv) ,(k rv))))	      
-	      (T-k test
-		   (lambda (test$)
-		     `(if ,test$
-			  ,(T-c then cont)
-			  ,(T-c else cont)))))]
+		   (cont `(lambda (,rv) ,(k rv))))
+	      (T-c exp cont))]
+	   [`(if ,test ,then ,else)
+	    (T-k test
+		 (lambda (test$)
+		   `(if ,test$
+			,(T-k then k)
+			,(T-k else k))))]
 	   [(f es ...)
 	    (if (prim? f)
 		(T*-k es
@@ -87,5 +84,3 @@
 		(let* ((rv (gensym 'rv$))
 		       (cont `(lambda (,rv) ,(k rv))))
 		  (T-c exp cont)))])))
-
-
