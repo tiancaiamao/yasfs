@@ -86,7 +86,7 @@
   (lambda (env x)
     (let ((sub (assq x env)))
       (if sub
-	  (cadr sub)
+	  (cdr sub)
 	  x))))
 
 (define assq-remove-key
@@ -125,13 +125,21 @@
       `(lambda ,(lambda->bind exp)
 	 ,(substitute (assq-remove-keys env (lambda->bind exp))
 		      (lambda->body exp))))
-     ((app? exp) (map substitute-with (begin->exp exp))))))
+     ((app? exp) (map substitute-with exp)))))
 
 (define (azip list1 list2)
   (if (and (pair? list1) (pair? list2))
       (cons (list (car list1) (car list2))
             (azip (cdr list1) (cdr list2)))
       '()))
+
+;; (fv1 fv2 ...) => ((fv1 (env-get 1 env)) (fv2 (env-get 2 env)) ...)
+(define fv->sub
+  (lambda (fv idx env)
+    (if (null? fv)
+	'()
+	(cons (cons (car fv) `(env-get ,idx ,env))
+	      (fv->sub (cdr fv) (+ idx 1) env)))))
 
 (define closure-convert
   (lambda (exp)
@@ -143,12 +151,10 @@
 	     (fv (difference (free-vars (lambda->body exp)) (lambda->bind exp)))
 	     (id (allocate-environment fv))
 	     ($env (gensym 'env))
-	     (sub (map (lambda (v)
-			 (list v `(env-get ,id ,v ,$env)))
-		       fv)))
+	     (sub (fv->sub fv 0 $env)))
 	`(closure (lambda (,$env ,@(lambda->bind exp))
 		    ,(substitute sub body))
-		  (env-make ,id ,@(azip fv fv)))))
+		  (env-make ,(length fv) ,@fv))))
      ((if? exp)
       `(if ,(closure-convert (if->test exp))
 	   ,(closure-convert (if->then exp))
