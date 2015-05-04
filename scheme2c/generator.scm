@@ -1,4 +1,4 @@
-(define (prim? x) (memq x '(+ - * / =)))
+(define (prim? x) (memq x '(+ - * / = env-get env-make)))
 
 (define split 
   (lambda (lst c)
@@ -7,6 +7,16 @@
      ((null? (cdr lst)) (car lst))
      (else 
       (string-append (car lst) c (split (cdr lst) c))))))
+
+(define generate-lambda
+  (lambda (bind body collect)
+    (let* ((func-name (symbol->string (gensym 'lambda__tmp)))
+	   (declear (string-append "void " func-name "(" 
+				   (split (map (lambda (x) (string-append "Value " (symbol->string x))) bind) ", ") ")"))
+	   (def (string-append declear " {\n" (generate body) "\n}\n")))
+      (collect func-name declear def))))
+
+(define global-funcs '())
 
 (define generate
   (lambda (exp)
@@ -19,7 +29,10 @@
 		(case exp
 		  ['+ "__add"]
 		  ['- "__sub"]
-		  ['* "__product"])		  
+		  ['* "__product"]
+		  ['env-get "VectorRef"]
+		  ['env-make "MakeEnv"]
+		  [else (symbol->string exp)])
 		(symbol->string exp))]
 	   [`(if ,test ,then ,else)
 	    (string-append "if (" (generate test) " == ValueTrue) {\n"
@@ -32,15 +45,15 @@
 	    (string-append (generate var) " = " (generate val) "\n")]
 	   [`(= ,rator ,rand)
 	    (string-append "ValueEqual(" (generate rator) ", " (generate rand) ")")]
+	   [('lambda bind body)
+	    (generate-lambda bind body
+			     (lambda (func-name declear def)
+			       (set! global-funcs (cons def global-funcs))
+			       func-name))]
+	   [('closure lam env)
+	    (string-append "MakeClosure(" (generate lam) ", " (generate env) ")")]
 	   [(rator rand ...)
 	    (if (prim? rator)
 		(string-append (generate rator) "(" (split (map generate rand) ", ") ")")
-		(string-append "((struct Closure*)" (generate rator) ")->lam(" (split (map generate rand) ", ") ")"))])))
-
-(print (generate '(set! a (begin 1 (if #t 2 3) 3 4))))
-
-(print (generate '(if (= n 0)
-	       1
-	       (* n (fact (- n 1))))))
-
-
+		(let ((tmp (string-append "((struct Closure*)" (generate rator) ")")))
+		  (string-append tmp "->lam(" tmp "->env, " (split (map generate rand) ", ") ")")))])))
