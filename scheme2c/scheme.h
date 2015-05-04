@@ -31,7 +31,7 @@ struct Env {
 struct Vector {
 	enum Tag t;
 	int size;
-	Value value[];
+	Value *value;
 };
 
 struct Cell {
@@ -48,8 +48,8 @@ union Value_t {
   struct Cell cell ;
 };
 
-static Value MakeClosure(Lambda lam, Value env) {
-	struct Closure* v  =	malloc(sizeof(struct Closure)); 
+static Value InitClosure(Value addr, Lambda lam, Value env) {
+  struct Closure* v  =	(struct Closure*)addr;
   v->t = CLOSURE ;
   v->lam = lam ;
   v->env = env ;
@@ -70,7 +70,7 @@ Value MakeBoolean(unsigned int b) {
   return (Value)v ;
 }
 
-// static Value MakePrimitive(Lambda prim) {
+// static Value InitPrimitive(Lambda prim) {
 //   struct Primitive * v = malloc(sizeof(struct Primitive));
 //   v->t = CLOSURE ;
 //   v->lam = prim ;
@@ -78,17 +78,27 @@ Value MakeBoolean(unsigned int b) {
 //   return (Value)v ;
 // }
 
-Value MakeVector(int n) {
-	struct Vector* v = malloc(sizeof(struct Vector) + n*sizeof(Value));
-	v->t = VECTOR;
-	v->size = n;
-	return (Value)v;
-}
+// Value InitVector(int n) {
+// 	struct Vector* v = malloc(sizeof(struct Vector) + n*sizeof(Value));
+// 	v->t = VECTOR;
+// 	v->size = n;
+// 	return (Value)v;
+// }
 
 Value VectorGet(Value v, int n) {
 	assert(v->t == VECTOR);
 	assert(((struct Vector*)v)->size > n);
 	return ((struct Vector*)v)->value[n];
+}
+
+Value VectorRef(Value n, Value e) {
+	assert(e->t == VECTOR);
+	assert(n->t == INT);
+
+	int nn = ((struct Int*)n)->value;
+	assert(((struct Vector*)e)->size > nn);
+	
+	return ((struct Vector*)e)->value[nn];
 }
 
 Value NewCell(Value initialValue) {

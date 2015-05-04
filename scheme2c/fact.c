@@ -9,12 +9,12 @@ Value ValueFalse;
 Value fact;
 Value c0;
 
-Value MakeEnv(Value n1, ...) {
+Value InitVector(Value addr, Value n1, ...) {
     int n;
     assert(n1->t == INT);
     n = ((struct Int *)n1)->value;
     va_list ap;
-    struct Vector *ret = (struct Vector *)MakeVector(n);
+    struct Vector *ret = (struct Vector *)addr;
 
     va_start(ap, n1);
     for (int i = 0; i < n; i++) {
@@ -54,26 +54,42 @@ void lambda__tmp8219(Value env5388, Value rv$5385) {
 }
 
 void lambda__tmp8218(Value env5389, Value n, Value k5384) {
+	struct Closure tmp1;
+	tmp1.t = CLOSURE;
+	
+	struct Vector tmp2;
+	tmp2.t = VECTOR;
+	tmp2.size = 2;
+	tmp2.value = alloca(2*sizeof(Value));
+		
     if (ValueEqual(n, MakeInt(0)) == ValueTrue) {
         ((struct Closure *)k5384)
             ->lam(((struct Closure *)k5384)->env, MakeInt(1));
     } else {
         ((struct Closure *)fact)
             ->lam(((struct Closure *)fact)->env, __sub(n, MakeInt(1)),
-                  MakeClosure(lambda__tmp8219, MakeEnv(MakeInt(2), k5384, n)));
+                  InitClosure((Value)&tmp1, lambda__tmp8219, InitVector((Value)&tmp2, MakeInt(2), k5384, n)));
     }
 }
 
-void init() {
+int main() {
+	struct Closure tmp1;
+	tmp1.t = CLOSURE;
+	
+	struct Closure tmp2;
+	tmp2.t = CLOSURE;
+	
+	struct Vector tmp3;	
+	tmp3.t = VECTOR;
+	tmp3.size = 1;
+	tmp3.value = alloca(1 * sizeof(Value));
+
+	
     ValueTrue = MakeBoolean(1);
     ValueFalse = MakeBoolean(0);
-    fact = MakeClosure(lambda__tmp8218, MakeEnv(MakeInt(1), fact));
-    c0 = MakeClosure(lambda__c0, NULL);
-}
-
-int main() {
-    init();
-
+    fact = InitClosure((Value)&tmp1, lambda__tmp8218, InitVector((Value)&tmp3, MakeInt(1), fact));
+    c0 = InitClosure((Value)&tmp2, lambda__c0, NULL);
+	
     ((struct Closure *)fact)
         ->lam(((struct Closure *)fact)->env, MakeInt(5), c0);
 

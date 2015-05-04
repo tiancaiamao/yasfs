@@ -82,7 +82,7 @@
 (define explicit-alloc
   (lambda (exp cont)
     (match exp
-	   [,x (guard (symbol? x)) (cont x '())]
+	   [,x (guard (or (symbol? x) (integer? x))) (cont x '())]
 	   [(if ,test ,then ,else)
 	    (explicit-alloc 
 	     test
@@ -98,15 +98,33 @@
 	    (explicit-alloc-list es 
 				 (lambda (es$ b)
 				   (cont `(begin ,@es$) b)))]
-	   [(cons ,x ,y)
-	    (let ((tmp (gensym 'tmp)))
-	      (cont `(InitCons ,tmp ,x ,y) (list (cons tmp '(cons . 2)))))]
+	   [(set! ,var ,val)
+	    (explicit-alloc val
+			    (lambda (val$ b)
+			      (cont `(set! ,var ,val$) b)))]
 	   [(lambda ,bind ,body)
 	    (explicit-alloc body
 			    (lambda (body$ b)
 			      (cont 
 			       `(lambda ,bind
-				  ,(append (pre-allocation b) (list body$))) '())))])))
+				  ,(append (pre-allocation b) (list body$))) '())))]
+	   [(cons ,x ,y)
+	    (let ((tmp (gensym 'tmp)))
+	      (explicit-alloc x
+			      (lambda (x$ b1)
+				(explicit-alloc y
+						(lambda (y$ b2)						  
+						  (cont `(InitCons ,tmp ,x$ ,y$) 
+							(append (cons (cons tmp '(cons . 2)) b1) b2)))))))]
+	   [(env-make ,num ,fvs ...)
+	    (let ((tmp (gensym 'tmp)))
+	      (cont `(InitVector ,tmp ,num ,@fvs) (list (cons tmp (cons 'vector num)))))]
+	   [(closure ,lam ,env)
+	    (let ((tmp (gensym 'tmp)))
+	      (explicit-alloc lam
+			      (lambda (lam$ b)
+				(cont `(InitClosure ,tmp ,lam$ ,env) (cons (cons tmp '(closure . 2)) b)))))])))
+				  
 
 ;; 将bind表转化为类似函数的表达式
 (define pre-allocation
