@@ -18,6 +18,13 @@
 
 (define global-funcs '())
 
+(define gensym
+  (let ((v 0))
+    (lambda (x)
+      (set! v (+ v 1))
+      (string->symbol
+       (string-append (symbol->string x) (number->string v))))))
+
 (define generate
   (lambda (exp)
     (match exp
@@ -57,3 +64,64 @@
 		(string-append (generate rator) "(" (split (map generate rand) ", ") ")")
 		(let ((tmp (string-append "((struct Closure*)" (generate rator) ")")))
 		  (string-append tmp "->lam(" tmp "->env, " (split (map generate rand) ", ") ")")))])))
+
+;; 接受一个lambda表达式，对里面的所有涉及到分配的操作拆分成分配空间和使用数据
+;; (lambda (x)
+;;    (cons x a)
+;;    (vector 6)) =>
+;; (lambda (x)
+;;    (allocation tmp1 CONS)
+;;    (allocation tmp2 VECTOR)
+;;    (init-cons tmp1 x a)
+;;    (init-vector tmp2 6))
+(define explicit-allocation
+  (lambda (exp)
+    (explicit-alloc exp (lambda (e b) e))))
+
+;; 接受一个exp和一个连续，返回exp和提取出来的分配
+(define explicit-alloc
+  (lambda (exp cont)
+    (match exp
+	   [,x (guard (symbol? x)) (cont x '())]
+	   [(if ,test ,then ,else)
+	    (explicit-alloc 
+	     test
+	     (lambda (test$ b1)
+	       (explicit-alloc
+		then
+		(lambda (then$ b2)
+		  (explicit-alloc
+		   else
+		   (lambda (else$ b3)
+		     (cont `(if ,test$ ,then$ ,else$) (append b1 b2 b3))))))))]
+	   [(begin ,es ...)
+	    (explicit-alloc-list es 
+				 (lambda (es$ b)
+				   (cont `(begin ,@es$) b)))]
+	   [(cons ,x ,y)
+	    (let ((tmp (gensym 'tmp)))
+	      (cont `(InitCons ,tmp ,x ,y) (list (cons tmp '(cons . 2)))))]
+	   [(lambda ,bind ,body)
+	    (explicit-alloc body
+			    (lambda (body$ b)
+			      (cont 
+			       `(lambda ,bind
+				  ,(append (pre-allocation b) (list body$))) '())))])))
+
+;; 将bind表转化为类似函数的表达式
+(define pre-allocation
+  (lambda (bind)
+    (map (lambda (x)
+	   (case (cadr x)
+	     ['cons `(ALLOC CONS ,(car x))])) bind)))
+
+(define explicit-alloc-list
+  (lambda (lst+ cont)
+    (explicit-alloc
+     (car lst+)
+     (lambda (e b)
+       (if (null? (cdr lst+))
+	   (cont (cons e '()) b)
+	   (explicit-alloc-list (cdr lst+)
+				(lambda (remain b1)
+				  (cont (cons e remain) (append b b1)))))))))
