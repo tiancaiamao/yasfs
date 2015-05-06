@@ -70,20 +70,25 @@
 ;;    (cons x a)
 ;;    (vector 6)) =>
 ;; (lambda (x)
-;;    (allocation tmp1 CONS)
-;;    (allocation tmp2 VECTOR)
-;;    (init-cons tmp1 x a)
-;;    (init-vector tmp2 6))
+;;    (locate ((tmp1 CONS 2)
+;;             (tmp2 VECTOR 6))
+;;            (InitCons tmp1 x a)
+;;            (InitVector tmp2 6))
 (define explicit-allocation
   (lambda (exp)
-    (explicit-alloc exp (lambda (e b) e))))
+    (explicit-alloc exp 
+		    (lambda (e b)
+		      (if (null? b)
+			  e
+			  `(locate ,b ,e))))))
 
 ;; 接受一个exp和一个连续，返回exp和提取出来的分配
 (define explicit-alloc
   (lambda (exp cont)
     (match exp
-	   [,x (guard (or (symbol? x) (integer? x))) (cont x '())]
-	   [(if ,test ,then ,else)
+	   [(? symbol?) (cont exp '())]
+	   [(? integer?) (cont exp '())]
+	   [`(if ,test ,then ,else)
 	    (explicit-alloc 
 	     test
 	     (lambda (test$ b1)
@@ -94,44 +99,45 @@
 		   else
 		   (lambda (else$ b3)
 		     (cont `(if ,test$ ,then$ ,else$) (append b1 b2 b3))))))))]
-	   [(begin ,es ...)
+	   [('begin es ...)
 	    (explicit-alloc-list es 
 				 (lambda (es$ b)
 				   (cont `(begin ,@es$) b)))]
-	   [(set! ,var ,val)
+	   [`(set! ,var ,val)
 	    (explicit-alloc val
 			    (lambda (val$ b)
 			      (cont `(set! ,var ,val$) b)))]
-	   [(lambda ,bind ,body)
+	   [('lambda bind body)
 	    (explicit-alloc body
 			    (lambda (body$ b)
-			      (cont 
-			       `(lambda ,bind
-				  ,(append (pre-allocation b) (list body$))) '())))]
-	   [(cons ,x ,y)
+			      (if (null? b)
+				  (cont exp '())				  
+				  (cont
+				   `(lambda ,bind
+				      (locate ,b ,body$)) '()))))]
+	   [`(cons ,x ,y)
 	    (let ((tmp (gensym 'tmp)))
 	      (explicit-alloc x
 			      (lambda (x$ b1)
 				(explicit-alloc y
 						(lambda (y$ b2)						  
 						  (cont `(InitCons ,tmp ,x$ ,y$) 
-							(append (cons (cons tmp '(cons . 2)) b1) b2)))))))]
-	   [(env-make ,num ,fvs ...)
+							(append (cons (list tmp 'CONS 2) b1) b2)))))))]
+	   [('env-make num fvs ...)
 	    (let ((tmp (gensym 'tmp)))
-	      (cont `(InitVector ,tmp ,num ,@fvs) (list (cons tmp (cons 'vector num)))))]
-	   [(closure ,lam ,env)
+	      (cont `(InitVector ,tmp ,num ,@fvs) (list (list tmp 'VECTOR num))))]
+	   [('closure lam env)
 	    (let ((tmp (gensym 'tmp)))
 	      (explicit-alloc lam
 			      (lambda (lam$ b)
-				(cont `(InitClosure ,tmp ,lam$ ,env) (cons (cons tmp '(closure . 2)) b)))))])))
-				  
-
-;; 将bind表转化为类似函数的表达式
-(define pre-allocation
-  (lambda (bind)
-    (map (lambda (x)
-	   (case (cadr x)
-	     ['cons `(ALLOC CONS ,(car x))])) bind)))
+				(explicit-alloc env
+						(lambda (env$ b1)
+						  (cont `(InitClosure ,tmp ,lam$ ,env$)
+							(append (cons (list tmp 'CLOSURE 2) b1) b)))))))]
+	   [(rator rand ...)
+	    (explicit-alloc-list rand
+				 (lambda (rand$ bind)
+				   (cont `(,rator ,@rand$) bind)))])))
 
 (define explicit-alloc-list
   (lambda (lst+ cont)
