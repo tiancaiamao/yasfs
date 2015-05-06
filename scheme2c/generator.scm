@@ -52,13 +52,27 @@
 	    (string-append (generate var) " = " (generate val) "\n")]
 	   [`(= ,rator ,rand)
 	    (string-append "ValueEqual(" (generate rator) ", " (generate rand) ")")]
+	   [('locate bind body)
+	    (string-append 
+	     (split (map (lambda (x) 
+		   (case (cadr x)
+		     ['CLOSURE (string-append "struct Closure " (symbol->string (car x)) ";")]
+		     ['VECTOR (let ((var (symbol->string (car x)))
+				    (size (number->string (caddr x))))
+				(string-append "struct Vector " var ";\n"
+					       var ".value = alloca(sizeof(Value)*" size ");"))]
+		     ['CONS (string-append "struct Cons " (symbol->string (car x)) ";")]))
+		   bind) "\n")
+	     "\n" (generate body))]
 	   [('lambda bind body)
 	    (generate-lambda bind body
 			     (lambda (func-name declear def)
 			       (set! global-funcs (cons def global-funcs))
 			       func-name))]
-	   [('closure lam env)
-	    (string-append "MakeClosure(" (generate lam) ", " (generate env) ")")]
+	   [('InitClosure addr lam env)
+	    (string-append "InitClosure(&" (symbol->string addr) ", " (generate lam) ", " (generate env) ")")]
+	   [('InitVector addr n v ...)
+	    (string-append "InitVector(&" (symbol->string addr) ", " (number->string n) ", " (split (map generate v) ", ") ")")]
 	   [(rator rand ...)
 	    (if (prim? rator)
 		(string-append (generate rator) "(" (split (map generate rand) ", ") ")")

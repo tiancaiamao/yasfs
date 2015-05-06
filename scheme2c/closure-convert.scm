@@ -165,3 +165,33 @@
      ((app? exp)
       (map closure-convert exp))
      (else (error "unhandled exp: " exp)))))
+
+
+(define closure
+  (lambda (f e)
+    (lambda x
+      (apply f (cons e x)))))
+
+(define env-make
+  (lambda (n . ls)
+    (list->vector ls)))
+
+(define env-get
+  (lambda (n e)
+    (vector-ref e n)))
+
+
+;;;;;;;;test;;;;;;;;;;;;;;
+(define halt (lambda (x) x))
+(define fact 
+  (closure
+   (lambda (env58306 n k58145)
+     (if (= n 0)
+	 (k58145 1)
+	 (fact (- n 1)
+	       (closure
+		(lambda (env58305 rv$58146)
+		  ((env-get 0 env58305) (* (env-get 1 env58305) rv$58146)))
+		(env-make 2 k58145 n)))))
+   (env-make 1 fact)))
+;; (fact 5 halt) => 120

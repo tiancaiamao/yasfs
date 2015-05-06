@@ -84,3 +84,15 @@
 		(let* ((rv (gensym 'rv$))
 		       (cont `(lambda (,rv) ,(k rv))))
 		  (T-c exp cont)))])))
+
+
+;;;;;;;;;;;;;test;;;;;;;
+(define halt (lambda (x) x))
+(define fact 
+  (lambda (n k5140)
+    (if (= n 0)
+	(k5140 1)
+	(fact (- n 1)
+	      (lambda (rv$5141)
+		(k5140 (* n rv$5141)))))))
+; (fact 5 halt) => 125

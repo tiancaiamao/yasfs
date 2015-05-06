@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdarg.h>
 
 typedef union Value_t* Value;
 enum Tag { VOID, INT, BOOLEAN, CLOSURE, CELL, ENV, VECTOR } ;
@@ -48,7 +49,7 @@ union Value_t {
   struct Cell cell ;
 };
 
-static Value InitClosure(Value addr, Lambda lam, Value env) {
+static Value InitClosure(struct Closure* addr, Lambda lam, Value env) {
   struct Closure* v  =	(struct Closure*)addr;
   v->t = CLOSURE ;
   v->lam = lam ;
@@ -78,12 +79,19 @@ Value MakeBoolean(unsigned int b) {
 //   return (Value)v ;
 // }
 
-// Value InitVector(int n) {
-// 	struct Vector* v = malloc(sizeof(struct Vector) + n*sizeof(Value));
-// 	v->t = VECTOR;
-// 	v->size = n;
-// 	return (Value)v;
-// }
+Value InitVector(struct Vector *addr, int n, ...) {
+    va_list ap;
+    addr->t = VECTOR;
+    addr->size = n;
+
+    va_start(ap, n);
+    for (int i = 0; i < n; i++) {
+        addr->value[i] = va_arg(ap, Value);
+    }
+    va_end(ap);
+
+    return (Value)addr;
+}
 
 Value VectorGet(Value v, int n) {
 	assert(v->t == VECTOR);
