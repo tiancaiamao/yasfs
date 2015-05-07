@@ -24,14 +24,6 @@ Value MakeBoolean(unsigned int b) {
     return (Value)v;
 }
 
-// static Value InitPrimitive(Lambda prim) {
-//   struct Primitive * v = malloc(sizeof(struct Primitive));
-//   v->t = CLOSURE ;
-//   v->lam = prim ;
-//   v->env = NULL ;
-//   return (Value)v ;
-// }
-
 Value InitVector(struct Vector *addr, int n, ...) {
     va_list ap;
     addr->t = VECTOR;
@@ -115,9 +107,10 @@ Value ValueTrue;
 Value ValueFalse;
 Value saved_cont_call;
 jmp_buf empty_stack_state;
+char *stackBottom;
+char *stackTop;
 
-void CheckMinorGC(Value c) {}
-
+// DriverLoop接受的参数是一个可以直接执行的Closure
 void DriverLoop(Value call) {
     // setjmp将当前上下文保存起来并返回0
     if (setjmp(empty_stack_state)) {
@@ -137,7 +130,186 @@ void EntryPoint(Value halt) {
     DriverLoop((Value)&tmp);
 }
 
+// --------------垃圾回收相关的一组函数--------------
+// 参数是一个vector，vector中第一个是closure，后面的是这个closure的参数
+static void _lambda_save_call(Value v) {
+    assert((enum Tag)v == VECTOR);
+    struct Vector *vec = (struct Vector *)v;
+    assert(vec->size > 0);
+    assert((enum Tag)(vec->value[0]) == CLOSURE);
+
+    struct Closure *clo = (struct Closure *)vec->value[0];
+
+    switch (vec->size) {
+    case 1:
+    case 2:
+    case 3:
+        clo->lam(clo->env, vec->value[1], vec->value[2], vec->value[3]);
+        break;
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+    case 8:
+    case 9:
+    case 10:
+    case 11:
+    case 12:
+    case 13:
+    case 14:
+    case 15:
+    case 16:
+        break;
+    }
+}
+
+// TODO 注意到堆上分配
+void SaveCall(Lambda lam, int n, ...) {
+    struct Closure *clo = malloc(sizeof(struct Closure));
+    InitClosure(clo, lam, NULL);
+
+    struct Vector *vec = malloc(sizeof(struct Vector));
+    // clo以及参数拷到vec
+    vec->value[0] = (Value)clo;
+
+    struct Closure *save = malloc(sizeof(struct Closure));
+    saved_cont_call = InitClosure(save, _lambda_save_call, (Value)vec);
+}
+
+int CheckMinorGC() { return 0; }
+
+void *heapStart;
+char *heapEnd;
+void *ptr;
+
+static int objectCount(Value obj) {
+    int tag = (enum Tag)obj;
+    switch (tag) {
+    case VECTOR:
+        return ((struct Vector *)obj)->size;
+    case CLOSURE:
+        return 1;
+    case CONS:
+        return 2;
+    case ENV:
+        return ((struct Env *)obj)->size;
+    }
+    return 0;
+}
+
+static Value getSlot(Value obj, int i) {
+    int tag = (enum Tag)obj;
+    switch (tag) {
+    case VECTOR:
+        return ((struct Vector *)obj)->value[i];
+    case CLOSURE:
+        assert(i == 0);
+        return ((struct Closure *)obj)->env;
+    case CONS:
+        assert(i == 0 || i == 1);
+        return i == 0 ? ((struct Cons *)obj)->car : ((struct Cons *)obj)->cdr;
+    case ENV:
+        return ((struct Env *)obj)->value[i];
+    }
+    assert(0);
+    return NULL;
+}
+
+static void setSlot(Value obj, int i, Value v) {
+    int tag = (enum Tag)obj;
+    switch (tag) {
+    case VECTOR:
+        ((struct Vector *)obj)->value[i] = v;
+    case CLOSURE:
+        assert(i == 0);
+        ((struct Closure *)obj)->env = v;
+    case CONS:
+        assert(i == 0 || i == 1);
+        if (i == 0) {
+            ((struct Cons *)obj)->car = v;
+        } else {
+            ((struct Cons *)obj)->cdr = v;
+        }
+    case ENV:
+        ((struct Env *)obj)->value[i] = v;
+    }
+    assert(0);
+}
+
+static int existsInStack(Value obj) { return (char *)obj <= stackTop && (char *)obj >= stackBottom; }
+
+static int isForwardingPtr(Value obj) { return 0; }
+
+static Value forwardingPtrTarget(Value obj) { return NULL; }
+
+static int objectSize(Value obj) {
+    int tag = (enum Tag)obj;
+    switch (tag) {
+    case CLOSURE:
+        return sizeof(struct Closure);
+    case ENV:
+        return sizeof(struct Env);
+    case CONS:
+        return sizeof(struct Cons);
+    case VECTOR:
+        return sizeof(struct Vector);
+    }
+    assert(0);
+}
+
+// TODO 要设置前向指针
+static int copyObject(Value obj, char *ptr) {
+    int tag = (enum Tag)obj;
+    switch (tag) {
+    case CLOSURE:
+        *((struct Closure *)ptr) = *((struct Closure *)obj);
+        return sizeof(struct Closure);
+    case ENV:
+        *((struct Env *)ptr) = *((struct Env *)obj);
+        return sizeof(struct Env);
+    case CONS:
+        *((struct Cons *)ptr) = *((struct Cons *)obj);
+        return sizeof(struct Cons);
+    case VECTOR:
+        *((struct Vector *)ptr) = *((struct Vector *)obj);
+        return sizeof(struct Vector);
+    }
+    assert(0);
+}
+
 void MinorGC() {
+    int i, bytes, count;
+    char *scanStart;
+    Value obj, slot;
     // 将数据拷到堆中
+    // 把saved_cont_call丢到堆顶，开始扫描堆
+    // 将被引用到的数据拷到堆，重复这个过程
+    // 注意copy_object函数设置了前向指针，并不是单纯拷贝
+    struct Vector *vec = (struct Vector *)saved_cont_call;
+    for (i = 0; i < vec->size; i++) {
+        bytes = copyObject(vec->value[i], heapEnd);
+        heapEnd += bytes;
+    }
+
+    scanStart = heapStart;
+    while (scanStart < heapEnd) {
+        obj = (Value)scanStart;
+        count = objectCount(obj);
+        for (i = 0; i < count; ++i) {
+            slot = getSlot(obj, i);
+            // 只需要处理在栈上的对象
+            if (existsInStack(slot)) {
+                if (isForwardingPtr(slot)) {
+                    setSlot(obj, i, forwardingPtrTarget(slot));
+                } else {
+                    bytes = copyObject(slot, heapEnd);
+                    setSlot(obj, i, (Value)heapEnd);
+                    heapEnd += bytes;
+                }
+            }
+        }
+        scanStart += objectSize(obj);
+    }
+
     longjmp(empty_stack_state, 1);
 }

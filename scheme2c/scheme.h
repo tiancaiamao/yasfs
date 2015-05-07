@@ -2,7 +2,7 @@
 #include <stdarg.h>
 
 typedef union Value_t* Value;
-enum Tag { VOID, INT, BOOLEAN, CLOSURE, CELL, ENV, VECTOR } ;
+enum Tag { VOID, INT, BOOLEAN, CLOSURE, CELL, ENV, VECTOR, CONS } ;
 
 typedef void (*Lambda)() ;
 
@@ -20,6 +20,12 @@ struct Closure {
   enum Tag t ;
   Lambda lam ;
   Value env ;
+};
+
+struct Cons {
+	enum Tag t;
+	Value car;
+	Value cdr;
 };
 
 // 其实跟Vector一样的，但是Tag不一样
@@ -65,11 +71,14 @@ Value ValueEqual(Value v1, Value v2);
 
 // EntryPoint是整个库的入口点。它的参数是整个计算结果的返回点
 void EntryPoint(Value);
-void CheckMinorGC(Value);
+int CheckMinorGC();
 void MinorGC();
+void SaveCall(Lambda lam, int n, ...);
 
 // TopLevel是生成的代码入口点
 extern void TopLevel(Value);
 
 extern Value ValueTrue;
 extern Value ValueFalse;
+extern char *stackTop;
+extern char *stackBottom;

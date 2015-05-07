@@ -6,6 +6,7 @@
 void lambda__tmp8534(Value env8527, Value rv$8526);
 Value fact;
 void lambda__tmp8533(Value env8528, Value n, Value k8525) {
+
     struct Closure tmp8530;
     struct Env tmp8531;
     tmp8531.value = alloca(sizeof(Value) * 2);
@@ -18,11 +19,15 @@ void lambda__tmp8533(Value env8528, Value n, Value k8525) {
 }
 
 void lambda__tmp8534(Value env8527, Value rv$8526) {
+
     ((struct Closure *)EnvRef(MakeInt(0), env8527))->lam(((struct Closure *)EnvRef(MakeInt(0), env8527))->env, __product(EnvRef(MakeInt(1), env8527), rv$8526));
 }
 
 void TopLevel(Value cont) {
-    CheckMinorGC(cont);
+    if (CheckMinorGC()) {
+        SaveCall(TopLevel, 1, cont);
+        MinorGC();
+    }
     struct Closure tmp8529;
     struct Env tmp8532;
     tmp8532.value = alloca(sizeof(Value) * 1);
