@@ -3,69 +3,45 @@
 #include "scheme.h"
 #include "assert.h"
 
-
-Value ValueTrue;
-Value ValueFalse;
 Value fact;
-Value c0;
 
-Value ValueEqual(Value v1, Value v2) {
-    assert(v1->t == v2->t);
-    if (((struct Int *)v1)->value == ((struct Int *)v2)->value) {
-        return ValueTrue;
-    }
-    return ValueFalse;
+void lambda__tmp24711(Value env24704, Value rv$24703) {
+    ((struct Closure *)VectorRef(MakeInt(0), env24704))
+        ->lam(((struct Closure *)VectorRef(MakeInt(0), env24704))->env, __product(VectorRef(MakeInt(1), env24704), rv$24703));
 }
 
-Value __product(Value v1, Value v2) {
-    int tmp = ((struct Int *)v1)->value * ((struct Int *)v2)->value;
-    return MakeInt(tmp);
-}
-
-Value __sub(Value v1, Value v2) {
-    int tmp = ((struct Int *)v1)->value - ((struct Int *)v2)->value;
-    return MakeInt(tmp);
-}
-
-void lambda__c0(Value e, Value v) {
-    printf("return = %d\n", ((struct Int *)v)->value);
-}
-
-void lambda__tmp7246(Value env15307, Value rv$5141) {
-    ((struct Closure *)VectorRef(MakeInt(0), env15307))
-        ->lam(((struct Closure *)VectorRef(MakeInt(0), env15307))->env,
-              __product(VectorRef(MakeInt(1), env15307), rv$5141));
-}
-
-void lambda__tmp7245(Value env15308, Value n, Value k5140) {
-    struct Closure tmp7240;
-    struct Vector tmp7241;
-    tmp7241.value = alloca(sizeof(Value) * 2);
+void lambda__tmp24710(Value env24705, Value n, Value k24702) {
+    struct Closure tmp24707;
+    struct Vector tmp24708;
+    tmp24708.value = alloca(sizeof(Value) * 2);
     if (ValueEqual(n, MakeInt(0)) == ValueTrue) {
-        ((struct Closure *)k5140)
-            ->lam(((struct Closure *)k5140)->env, MakeInt(1));
+        ((struct Closure *)k24702)->lam(((struct Closure *)k24702)->env, MakeInt(1));
     } else {
         ((struct Closure *)fact)
-            ->lam(((struct Closure *)fact)->env, __sub(n, MakeInt(1)),
-                  InitClosure(&tmp7240, lambda__tmp7246,
-                              InitVector(&tmp7241, 2, k5140, n)));
+            ->lam(((struct Closure *)fact)->env, __sub(n, MakeInt(1)), InitClosure(&tmp24707, lambda__tmp24711, InitVector(&tmp24708, 2, k24702, n)));
     }
 }
 
+void TopLevel(Value cont) {
+    CheckMinorGC(cont);
+
+    // 正常代码
+    struct Closure tmp24706;
+    struct Vector tmp24709;
+    tmp24709.value = alloca(sizeof(Value) * 1);
+    fact = InitClosure(&tmp24706, lambda__tmp24710, InitVector(&tmp24709, 1, fact));
+
+    ((struct Closure *)fact)->lam(((struct Closure *)fact)->env, MakeInt(5), cont);
+}
+
+void lambda__c0(Value e, Value v) { printf("return = %d\n", ((struct Int *)v)->value); }
+
 int main() {
-    ValueTrue = MakeBoolean(1);
-    ValueFalse = MakeBoolean(0);
+    // c0的初始化要在EntryPoint前面
     struct Closure tmp2;
-    c0 = InitClosure(&tmp2, lambda__c0, NULL);
+    InitClosure(&tmp2, lambda__c0, NULL);
 
-    struct Closure tmp7239;
-    struct Vector tmp7242;
-    tmp7242.value = alloca(sizeof(Value) * 1);
-    fact =
-        InitClosure(&tmp7239, lambda__tmp7245, InitVector(&tmp7242, 1, fact));
-
-    ((struct Closure *)fact)
-        ->lam(((struct Closure *)fact)->env, MakeInt(5), c0);
+    EntryPoint((Value)&tmp2);
 
     return 0;
 }

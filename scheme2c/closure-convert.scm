@@ -16,6 +16,10 @@
 (define (set!->var e) (cadr e))
 (define (set!->val e) (caddr e))
 
+(define (define? e) (tagged-list? e 'define))
+(define (define->var e) (cadr e))
+(define (define->val e) (caddr e))
+
 (define (begin? e) (tagged-list? e 'begin))
 (define (begin->exp e) (cdr e))
 
@@ -162,6 +166,9 @@
      ((set!? exp)
       `(set! ,(set!->var exp)
 	     ,(closure-convert (set!->val exp))))
+     ((define? exp)
+      `(define ,(define->var exp)
+	 ,(closure-convert (define->val exp))))
      ((app? exp)
       (map closure-convert exp))
      (else (error "unhandled exp: " exp)))))

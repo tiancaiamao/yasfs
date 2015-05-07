@@ -28,6 +28,8 @@
 	    (T-k val
 		 (lambda (v)
 		   `(set!/k ,var ,v ,c)))]
+	   [`(define ,var ,val)
+	    (T-k exp (lambda (x) x))]
 	   [`(if ,test ,then ,else)
 	    (T-k exp
 		 (lambda (v)
@@ -76,6 +78,8 @@
 		   `(if ,test$
 			,(T-k then k)
 			,(T-k else k))))]
+	   [`(define ,var ,val)
+	    `(define ,var ,(T-k val k))]
 	   [(f es ...)
 	    (if (prim? f)
 		(T*-k es

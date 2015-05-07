@@ -49,28 +49,6 @@ union Value_t {
   struct Cell cell ;
 };
 
-static Value InitClosure(struct Closure* addr, Lambda lam, Value env) {
-  struct Closure* v  =	(struct Closure*)addr;
-  v->t = CLOSURE ;
-  v->lam = lam ;
-  v->env = env ;
-  return (Value)v;
-}
-
-Value MakeInt(int n) {
-  struct Int* v = malloc(sizeof(struct Int));
-  v->t = INT ;
-  v->value = n ;
-  return (Value)v ;
-}
-
-Value MakeBoolean(unsigned int b) {
-  struct Boolean* v  = malloc(sizeof(struct Boolean));
-  v->t = BOOLEAN ;
-  v->value = b ;
-  return (Value)v ;
-}
-
 // static Value InitPrimitive(Lambda prim) {
 //   struct Primitive * v = malloc(sizeof(struct Primitive));
 //   v->t = CLOSURE ;
@@ -79,39 +57,25 @@ Value MakeBoolean(unsigned int b) {
 //   return (Value)v ;
 // }
 
-Value InitVector(struct Vector *addr, int n, ...) {
-    va_list ap;
-    addr->t = VECTOR;
-    addr->size = n;
+Value InitClosure(struct Closure *addr, Lambda lam, Value env);
+Value MakeInt(int n);
+Value MakeBoolean(unsigned int b);
+Value InitVector(struct Vector *addr, int n, ...);
+Value VectorGet(Value v, int n);
+Value VectorRef(Value n, Value e);
+Value NewCell(Value initialValue);
 
-    va_start(ap, n);
-    for (int i = 0; i < n; i++) {
-        addr->value[i] = va_arg(ap, Value);
-    }
-    va_end(ap);
+Value __sub(Value v1, Value v2);
+Value __product(Value v1, Value v2);
+Value ValueEqual(Value v1, Value v2);
 
-    return (Value)addr;
-}
+// EntryPoint是整个库的入口点。它的参数是整个计算结果的返回点
+void EntryPoint(Value);
+void CheckMinorGC(Value);
+void MinorGC();
 
-Value VectorGet(Value v, int n) {
-	assert(v->t == VECTOR);
-	assert(((struct Vector*)v)->size > n);
-	return ((struct Vector*)v)->value[n];
-}
+// TopLevel是生成的代码入口点
+extern void TopLevel(Value);
 
-Value VectorRef(Value n, Value e) {
-	assert(e->t == VECTOR);
-	assert(n->t == INT);
-
-	int nn = ((struct Int*)n)->value;
-	assert(((struct Vector*)e)->size > nn);
-	
-	return ((struct Vector*)e)->value[nn];
-}
-
-Value NewCell(Value initialValue) {
-  struct Cell* v = malloc(sizeof(struct Cell));
-  v->t = CELL ;
-  v->addr = initialValue ;
-  return (Value)v ;
-}
+extern Value ValueTrue;
+extern Value ValueFalse;

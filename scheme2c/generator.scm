@@ -17,6 +17,7 @@
       (collect func-name declear def))))
 
 (define global-funcs '())
+(define global-vars '())
 
 (define gensym
   (let ((v 0))
@@ -50,19 +51,23 @@
 	    (split (map generate exps) "\n")]
 	   [`(set! ,var ,val)
 	    (string-append (generate var) " = " (generate val) "\n")]
+	   [`(define ,var ,val)
+	    (set! global-vars
+		  (cons (string-append "Value " (symbol->string var) ";") global-vars))
+	    (string-append (generate var) " = " (generate val) "\n")]
 	   [`(= ,rator ,rand)
 	    (string-append "ValueEqual(" (generate rator) ", " (generate rand) ")")]
 	   [('locate bind body)
 	    (string-append 
 	     (split (map (lambda (x) 
-		   (case (cadr x)
-		     ['CLOSURE (string-append "struct Closure " (symbol->string (car x)) ";")]
-		     ['VECTOR (let ((var (symbol->string (car x)))
-				    (size (number->string (caddr x))))
-				(string-append "struct Vector " var ";\n"
-					       var ".value = alloca(sizeof(Value)*" size ");"))]
-		     ['CONS (string-append "struct Cons " (symbol->string (car x)) ";")]))
-		   bind) "\n")
+			   (case (cadr x)
+			     ['CLOSURE (string-append "struct Closure " (symbol->string (car x)) ";")]
+			     ['VECTOR (let ((var (symbol->string (car x)))
+					    (size (number->string (caddr x))))
+					(string-append "struct Vector " var ";\n"
+						       var ".value = alloca(sizeof(Value)*" size ");"))]
+			     ['CONS (string-append "struct Cons " (symbol->string (car x)) ";")]))
+			 bind) "\n")
 	     "\n" (generate body))]
 	   [('lambda bind body)
 	    (generate-lambda bind body
@@ -121,6 +126,10 @@
 	    (explicit-alloc val
 			    (lambda (val$ b)
 			      (cont `(set! ,var ,val$) b)))]
+	   [`(define ,var ,val)
+	    (explicit-alloc val
+			    (lambda (val$ b)
+			      (cont `(define ,var ,val$) b)))]
 	   [('lambda bind body)
 	    (explicit-alloc body
 			    (lambda (body$ b)
