@@ -46,6 +46,20 @@ Value InitVector(struct Vector *addr, int n, ...) {
     return (Value)addr;
 }
 
+Value InitEnv(struct Env *addr, int n, ...) {
+    va_list ap;
+    addr->t = ENV;
+    addr->size = n;
+
+    va_start(ap, n);
+    for (int i = 0; i < n; i++) {
+        addr->value[i] = va_arg(ap, Value);
+    }
+    va_end(ap);
+
+    return (Value)addr;
+}
+
 Value VectorGet(Value v, int n) {
     assert(v->t == VECTOR);
     assert(((struct Vector *)v)->size > n);

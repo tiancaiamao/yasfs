@@ -62,6 +62,10 @@
 	     (split (map (lambda (x) 
 			   (case (cadr x)
 			     ['CLOSURE (string-append "struct Closure " (symbol->string (car x)) ";")]
+			     ['ENV (let ((var (symbol->string (car x)))
+					 (size (number->string (caddr x))))
+				     (string-append "struct Env " var ";\n"
+						    var ".value = alloca(sizeof(Value)*" size ");"))]
 			     ['VECTOR (let ((var (symbol->string (car x)))
 					    (size (number->string (caddr x))))
 					(string-append "struct Vector " var ";\n"
@@ -78,6 +82,8 @@
 	    (string-append "InitClosure(&" (symbol->string addr) ", " (generate lam) ", " (generate env) ")")]
 	   [('InitVector addr n v ...)
 	    (string-append "InitVector(&" (symbol->string addr) ", " (number->string n) ", " (split (map generate v) ", ") ")")]
+	   [('InitEnv addr n v ...)
+	    (string-append "InitEnv(&" (symbol->string addr) ", " (number->string n) ", " (split (map generate v) ", ") ")")]
 	   [(rator rand ...)
 	    (if (prim? rator)
 		(string-append (generate rator) "(" (split (map generate rand) ", ") ")")
@@ -148,7 +154,7 @@
 							(append (cons (list tmp 'CONS 2) b1) b2)))))))]
 	   [('env-make num fvs ...)
 	    (let ((tmp (gensym 'tmp)))
-	      (cont `(InitVector ,tmp ,num ,@fvs) (list (list tmp 'VECTOR num))))]
+	      (cont `(InitEnv ,tmp ,num ,@fvs) (list (list tmp 'ENV num))))]
 	   [('closure lam env)
 	    (let ((tmp (gensym 'tmp)))
 	      (explicit-alloc lam

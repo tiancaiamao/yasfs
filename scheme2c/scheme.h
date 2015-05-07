@@ -22,11 +22,11 @@ struct Closure {
   Value env ;
 };
 
+// 其实跟Vector一样的，但是Tag不一样
 struct Env {
   enum Tag t ;
-  Value d1;
-  Value d2;
-  void* env ;
+  int size;
+  Value *value;
 };
 
 struct Vector {
@@ -49,18 +49,11 @@ union Value_t {
   struct Cell cell ;
 };
 
-// static Value InitPrimitive(Lambda prim) {
-//   struct Primitive * v = malloc(sizeof(struct Primitive));
-//   v->t = CLOSURE ;
-//   v->lam = prim ;
-//   v->env = NULL ;
-//   return (Value)v ;
-// }
-
 Value InitClosure(struct Closure *addr, Lambda lam, Value env);
 Value MakeInt(int n);
 Value MakeBoolean(unsigned int b);
 Value InitVector(struct Vector *addr, int n, ...);
+Value InitEnv(struct Env *addr, int n, ...);
 Value VectorGet(Value v, int n);
 Value VectorRef(Value n, Value e);
 Value NewCell(Value initialValue);
