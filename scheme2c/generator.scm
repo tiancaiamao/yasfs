@@ -38,8 +38,7 @@
 		  ['+ "__add"]
 		  ['- "__sub"]
 		  ['* "__product"]
-		  ['env-get "VectorRef"]
-		  ['env-make "MakeEnv"]
+		  ['env-get "EnvRef"]
 		  [else (symbol->string exp)])
 		(symbol->string exp))]
 	   [`(if ,test ,then ,else)
@@ -77,6 +76,7 @@
 	    (generate-lambda bind body
 			     (lambda (func-name declear def)
 			       (set! global-funcs (cons def global-funcs))
+			       (set! global-vars (cons declear global-vars))
 			       func-name))]
 	   [('InitClosure addr lam env)
 	    (string-append "InitClosure(&" (symbol->string addr) ", " (generate lam) ", " (generate env) ")")]

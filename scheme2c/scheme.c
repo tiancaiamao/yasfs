@@ -76,6 +76,16 @@ Value VectorRef(Value n, Value e) {
     return ((struct Vector *)e)->value[nn];
 }
 
+Value EnvRef(Value n, Value e) {
+    assert(e->t == ENV);
+    assert(n->t == INT);
+
+    int nn = ((struct Int *)n)->value;
+    assert(((struct Vector *)e)->size > nn);
+
+    return ((struct Vector *)e)->value[nn];
+}
+
 Value NewCell(Value initialValue) {
     struct Cell *v = malloc(sizeof(struct Cell));
     v->t = CELL;

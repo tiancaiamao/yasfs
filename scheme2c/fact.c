@@ -3,33 +3,30 @@
 #include "scheme.h"
 #include "assert.h"
 
+void lambda__tmp8534(Value env8527, Value rv$8526);
 Value fact;
-
-void lambda__tmp24711(Value env24704, Value rv$24703) {
-    ((struct Closure *)VectorRef(MakeInt(0), env24704))
-        ->lam(((struct Closure *)VectorRef(MakeInt(0), env24704))->env, __product(VectorRef(MakeInt(1), env24704), rv$24703));
-}
-
-void lambda__tmp24710(Value env24705, Value n, Value k24702) {
-    struct Closure tmp24707;
-    struct Vector tmp24708;
-    tmp24708.value = alloca(sizeof(Value) * 2);
+void lambda__tmp8533(Value env8528, Value n, Value k8525) {
+    struct Closure tmp8530;
+    struct Env tmp8531;
+    tmp8531.value = alloca(sizeof(Value) * 2);
     if (ValueEqual(n, MakeInt(0)) == ValueTrue) {
-        ((struct Closure *)k24702)->lam(((struct Closure *)k24702)->env, MakeInt(1));
+        ((struct Closure *)k8525)->lam(((struct Closure *)k8525)->env, MakeInt(1));
     } else {
         ((struct Closure *)fact)
-            ->lam(((struct Closure *)fact)->env, __sub(n, MakeInt(1)), InitClosure(&tmp24707, lambda__tmp24711, InitVector(&tmp24708, 2, k24702, n)));
+            ->lam(((struct Closure *)fact)->env, __sub(n, MakeInt(1)), InitClosure(&tmp8530, lambda__tmp8534, InitEnv(&tmp8531, 2, k8525, n)));
     }
+}
+
+void lambda__tmp8534(Value env8527, Value rv$8526) {
+    ((struct Closure *)EnvRef(MakeInt(0), env8527))->lam(((struct Closure *)EnvRef(MakeInt(0), env8527))->env, __product(EnvRef(MakeInt(1), env8527), rv$8526));
 }
 
 void TopLevel(Value cont) {
     CheckMinorGC(cont);
-
-    // 正常代码
-    struct Closure tmp24706;
-    struct Vector tmp24709;
-    tmp24709.value = alloca(sizeof(Value) * 1);
-    fact = InitClosure(&tmp24706, lambda__tmp24710, InitVector(&tmp24709, 1, fact));
+    struct Closure tmp8529;
+    struct Env tmp8532;
+    tmp8532.value = alloca(sizeof(Value) * 1);
+    fact = InitClosure(&tmp8529, lambda__tmp8533, InitEnv(&tmp8532, 1, fact));
 
     ((struct Closure *)fact)->lam(((struct Closure *)fact)->env, MakeInt(5), cont);
 }

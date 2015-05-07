@@ -56,6 +56,7 @@ Value InitVector(struct Vector *addr, int n, ...);
 Value InitEnv(struct Env *addr, int n, ...);
 Value VectorGet(Value v, int n);
 Value VectorRef(Value n, Value e);
+Value EnvRef(Value n, Value e);
 Value NewCell(Value initialValue);
 
 Value __sub(Value v1, Value v2);
