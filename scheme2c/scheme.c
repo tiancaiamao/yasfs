@@ -10,19 +10,9 @@ Value InitClosure(struct Closure *addr, Lambda lam, Value env) {
     return (Value)v;
 }
 
-Value MakeInt(int n) {
-    struct Int *v = malloc(sizeof(struct Int));
-    v->t = INT;
-    v->value = n;
-    return (Value)v;
-}
+Value MakeInt(int n) { return (n << 1) & 1; }
 
-Value MakeBoolean(unsigned int b) {
-    struct Boolean *v = malloc(sizeof(struct Boolean));
-    v->t = BOOLEAN;
-    v->value = b;
-    return (Value)v;
-}
+Value MakeBoolean(unsigned int b) { return b == 0 ? ValueFalse : ValueTrue; }
 
 Value InitVector(struct Vector *addr, int n, ...) {
     va_list ap;
@@ -53,62 +43,54 @@ Value InitEnv(struct Env *addr, int n, ...) {
 }
 
 Value VectorGet(Value v, int n) {
-    assert(v->t == VECTOR);
+    assert((long)v->t == VECTOR);
     assert(((struct Vector *)v)->size > n);
     return ((struct Vector *)v)->value[n];
 }
 
 Value VectorRef(Value n, Value e) {
-    assert(e->t == VECTOR);
-    assert(n->t == INT);
+    assert((long)e->t == VECTOR);
+    assert(((long)n & 1) == 1);
 
-    int nn = ((struct Int *)n)->value;
+    int nn = (long)n >> 1;
     assert(((struct Vector *)e)->size > nn);
 
     return ((struct Vector *)e)->value[nn];
 }
 
 Value EnvRef(Value n, Value e) {
-    assert(e->t == ENV);
-    assert(n->t == INT);
+    assert((long)e->t == ENV);
+    assert(((long)n->t & 1) == 1);
 
-    int nn = ((struct Int *)n)->value;
+    int nn = (long)n >> 1;
     assert(((struct Vector *)e)->size > nn);
 
     return ((struct Vector *)e)->value[nn];
 }
 
-Value NewCell(Value initialValue) {
-    struct Cell *v = malloc(sizeof(struct Cell));
-    v->t = CELL;
-    v->addr = initialValue;
-    return (Value)v;
-}
-
 Value ValueEqual(Value v1, Value v2) {
     assert(v1->t == v2->t);
-    if (((struct Int *)v1)->value == ((struct Int *)v2)->value) {
+    if (v1 == v2) {
         return ValueTrue;
     }
     return ValueFalse;
 }
 
-Value __product(Value v1, Value v2) {
-    int tmp = ((struct Int *)v1)->value * ((struct Int *)v2)->value;
-    return MakeInt(tmp);
-}
+Value __product(Value v1, Value v2) { return ((((long)v1 >> 1) * ((long)v2 >> 1)) << 1) + 1; }
 
-Value __sub(Value v1, Value v2) {
-    int tmp = ((struct Int *)v1)->value - ((struct Int *)v2)->value;
-    return MakeInt(tmp);
-}
+Value __sub(Value v1, Value v2) { return v1 - v2; }
 
-Value ValueTrue;
-Value ValueFalse;
+Value ValueTrue = 0xa;
+Value ValueFalse = 0x2;
 Value saved_cont_call;
 jmp_buf empty_stack_state;
+Value FORWARD;
 char *stackBottom;
 char *stackTop;
+
+char *heapStart;
+char *heapEnd;
+void *ptr;
 
 // DriverLoop接受的参数是一个可以直接执行的Closure
 void DriverLoop(Value call) {
@@ -121,8 +103,12 @@ void DriverLoop(Value call) {
 }
 
 void EntryPoint(Value halt) {
-    ValueTrue = MakeBoolean(1);
-    ValueFalse = MakeBoolean(0);
+    // 初始化部分可以写到这里	
+
+    // 初始4M的堆空间
+    const int heapSize = 4 << 20;
+    heapStart = malloc(heapSize);
+    heapEnd = heapStart + heapSize;
 
     struct Closure tmp;
     InitClosure(&tmp, TopLevel, halt);
@@ -133,10 +119,10 @@ void EntryPoint(Value halt) {
 // --------------垃圾回收相关的一组函数--------------
 // 参数是一个vector，vector中第一个是closure，后面的是这个closure的参数
 static void _lambda_save_call(Value v) {
-    assert((enum Tag)v == VECTOR);
+    assert((((long)v & 7) == 0) && ((long)v->t == VECTOR));
     struct Vector *vec = (struct Vector *)v;
     assert(vec->size > 0);
-    assert((enum Tag)(vec->value[0]) == CLOSURE);
+    assert((((long)(vec->value[0]) & 7) == 0) && (((long)((struct Vector *)vec->value[0])->t) == CLOSURE));
 
     struct Closure *clo = (struct Closure *)vec->value[0];
 
@@ -178,28 +164,24 @@ void SaveCall(Lambda lam, int n, ...) {
 
 int CheckMinorGC() { return 0; }
 
-void *heapStart;
-char *heapEnd;
-void *ptr;
-
 static int objectCount(Value obj) {
-    int tag = (enum Tag)obj;
-    switch (tag) {
-    case VECTOR:
-        return ((struct Vector *)obj)->size;
-    case CLOSURE:
-        return 1;
-    case CONS:
-        return 2;
-    case ENV:
-        return ((struct Env *)obj)->size;
+    if (((long)obj & 7) == 0) {
+        switch ((long)obj) {
+        case VECTOR:
+            return ((struct Vector *)obj)->size;
+        case CLOSURE:
+            return 1;
+        case CONS:
+            return 2;
+        case ENV:
+            return ((struct Env *)obj)->size;
+        }
     }
     return 0;
 }
 
 static Value getSlot(Value obj, int i) {
-    int tag = (enum Tag)obj;
-    switch (tag) {
+    switch ((long)obj) {
     case VECTOR:
         return ((struct Vector *)obj)->value[i];
     case CLOSURE:
@@ -216,8 +198,7 @@ static Value getSlot(Value obj, int i) {
 }
 
 static void setSlot(Value obj, int i, Value v) {
-    int tag = (enum Tag)obj;
-    switch (tag) {
+    switch ((long)obj) {
     case VECTOR:
         ((struct Vector *)obj)->value[i] = v;
     case CLOSURE:
@@ -243,8 +224,7 @@ static int isForwardingPtr(Value obj) { return 0; }
 static Value forwardingPtrTarget(Value obj) { return NULL; }
 
 static int objectSize(Value obj) {
-    int tag = (enum Tag)obj;
-    switch (tag) {
+    switch ((long)obj) {
     case CLOSURE:
         return sizeof(struct Closure);
     case ENV:
@@ -257,10 +237,8 @@ static int objectSize(Value obj) {
     assert(0);
 }
 
-// TODO 要设置前向指针
 static int copyObject(Value obj, char *ptr) {
-    int tag = (enum Tag)obj;
-    switch (tag) {
+    switch ((long)obj) {
     case CLOSURE:
         *((struct Closure *)ptr) = *((struct Closure *)obj);
         return sizeof(struct Closure);
@@ -281,10 +259,7 @@ void MinorGC() {
     int i, bytes, count;
     char *scanStart;
     Value obj, slot;
-    // 将数据拷到堆中
-    // 把saved_cont_call丢到堆顶，开始扫描堆
-    // 将被引用到的数据拷到堆，重复这个过程
-    // 注意copy_object函数设置了前向指针，并不是单纯拷贝
+
     struct Vector *vec = (struct Vector *)saved_cont_call;
     for (i = 0; i < vec->size; i++) {
         bytes = copyObject(vec->value[i], heapEnd);

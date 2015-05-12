@@ -1,59 +1,67 @@
 #include <assert.h>
 #include <stdarg.h>
 
-typedef union Value_t* Value;
-enum Tag { VOID, INT, BOOLEAN, CLOSURE, CELL, ENV, VECTOR, CONS } ;
+// 001 fixnum
+// 000 pointer
+// 010 bool
+// 100 char
+// 110 other
 
+// 1110 void
+// 1010 true
+// 0010 false
+
+typedef union Value_t* Value;
+
+#define INTERMEDIA_TYPE_MASK	 0x00f00007L
+#define CLOSURE			 0x00100000L
+#define CONS			 0x00200000L
+#define VECTOR			 0x00300000L
+#define ENV				 0x00400000L
+#define SYMBOL			 0x00500000L
+
+typedef void* Tag;
 typedef void (*Lambda)() ;
 
-struct Int {
-  enum Tag t ;
-  int value ;
-};
-
-struct Boolean {
-  enum Tag t ;
-  unsigned int value ;
-};
-
 struct Closure {
-  enum Tag t ;
+  Tag t ;
   Lambda lam ;
   Value env ;
 };
 
 struct Cons {
-	enum Tag t;
+	Tag t;
 	Value car;
 	Value cdr;
 };
 
 // 其实跟Vector一样的，但是Tag不一样
 struct Env {
-  enum Tag t ;
+  Tag t ;
   int size;
   Value *value;
 };
 
 struct Vector {
-	enum Tag t;
+	Tag t;
 	int size;
 	Value *value;
 };
 
 struct Cell {
-  enum Tag t ;
+  Tag t ;
   Value addr ; 
 };
 
 union Value_t {
-  enum Tag t ;
-  struct Int z ;
-  struct Boolean b ;
+  Tag t ;
   struct Closure clo ;
   struct Env env ;
-  struct Cell cell ;
+  struct Cons cons;
 };
+
+extern Value ValueTrue;
+extern Value ValueFalse;
 
 Value InitClosure(struct Closure *addr, Lambda lam, Value env);
 Value MakeInt(int n);
@@ -63,7 +71,6 @@ Value InitEnv(struct Env *addr, int n, ...);
 Value VectorGet(Value v, int n);
 Value VectorRef(Value n, Value e);
 Value EnvRef(Value n, Value e);
-Value NewCell(Value initialValue);
 
 Value __sub(Value v1, Value v2);
 Value __product(Value v1, Value v2);
@@ -78,7 +85,5 @@ void SaveCall(Lambda lam, int n, ...);
 // TopLevel是生成的代码入口点
 extern void TopLevel(Value);
 
-extern Value ValueTrue;
-extern Value ValueFalse;
 extern char *stackTop;
 extern char *stackBottom;

@@ -36,7 +36,7 @@ void TopLevel(Value cont) {
     ((struct Closure *)fact)->lam(((struct Closure *)fact)->env, MakeInt(5), cont);
 }
 
-void lambda__c0(Value e, Value v) { printf("return = %d\n", ((struct Int *)v)->value); }
+void lambda__c0(Value e, Value v) { printf("return = %ld\n", (long)v >> 1); }
 
 int main() {
     // c0的初始化要在EntryPoint前面
