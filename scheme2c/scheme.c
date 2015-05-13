@@ -10,7 +10,7 @@ Value InitClosure(struct Closure *addr, Lambda lam, Value env) {
     return (Value)v;
 }
 
-Value MakeInt(int n) { return (n << 1) & 1; }
+Value MakeInt(int n) { return (n << 1) | 1; }
 
 Value MakeBoolean(unsigned int b) { return b == 0 ? ValueFalse : ValueTrue; }
 
@@ -60,7 +60,7 @@ Value VectorRef(Value n, Value e) {
 
 Value EnvRef(Value n, Value e) {
     assert((long)e->t == ENV);
-    assert(((long)n->t & 1) == 1);
+    assert(((long)n&1) == 1);
 
     int nn = (long)n >> 1;
     assert(((struct Vector *)e)->size > nn);
@@ -69,7 +69,6 @@ Value EnvRef(Value n, Value e) {
 }
 
 Value ValueEqual(Value v1, Value v2) {
-    assert(v1->t == v2->t);
     if (v1 == v2) {
         return ValueTrue;
     }
@@ -78,7 +77,7 @@ Value ValueEqual(Value v1, Value v2) {
 
 Value __product(Value v1, Value v2) { return ((((long)v1 >> 1) * ((long)v2 >> 1)) << 1) + 1; }
 
-Value __sub(Value v1, Value v2) { return v1 - v2; }
+Value __sub(Value v1, Value v2) { return ((long)v1 - (long)v2) | 0x1; }
 
 Value ValueTrue = 0xa;
 Value ValueFalse = 0x2;
@@ -103,7 +102,7 @@ void DriverLoop(Value call) {
 }
 
 void EntryPoint(Value halt) {
-    // 初始化部分可以写到这里	
+    // 初始化部分可以写到这里
 
     // 初始4M的堆空间
     const int heapSize = 4 << 20;
