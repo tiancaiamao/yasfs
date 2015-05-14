@@ -10,7 +10,7 @@ Value InitClosure(struct Closure *addr, Lambda lam, Value env) {
     return (Value)v;
 }
 
-Value MakeInt(int n) { return (n << 1) | 1; }
+Value MakeInt(int n) { return (Value)(((intptr_t)n << 1) | 0x1); }
 
 Value MakeBoolean(unsigned int b) { return b == 0 ? ValueFalse : ValueTrue; }
 
@@ -60,7 +60,7 @@ Value VectorRef(Value n, Value e) {
 
 Value EnvRef(Value n, Value e) {
     assert((long)e->t == ENV);
-    assert(((long)n&1) == 1);
+    assert(((long)n & 1) == 1);
 
     int nn = (long)n >> 1;
     assert(((struct Vector *)e)->size > nn);
@@ -75,24 +75,25 @@ Value ValueEqual(Value v1, Value v2) {
     return ValueFalse;
 }
 
-Value __product(Value v1, Value v2) { return ((((long)v1 >> 1) * ((long)v2 >> 1)) << 1) + 1; }
+Value __product(Value v1, Value v2) { return (Value)(((((Tag)v1 >> 1) * ((Tag)v2 >> 1)) << 1) | 0x1); }
 
-Value __sub(Value v1, Value v2) { return ((long)v1 - (long)v2) | 0x1; }
+Value __sub(Value v1, Value v2) { return (Value)(((Tag)v1 - (Tag)v2) | 0x1); }
 
-Value ValueTrue = 0xa;
-Value ValueFalse = 0x2;
+Value ValueTrue = (Value)0xa;
+Value ValueFalse = (Value)0x2;
 Value saved_cont_call;
 jmp_buf empty_stack_state;
-Value FORWARD;
 char *stackBottom;
 char *stackTop;
+static int MinorGCSize = 4 << 10;
+// static int MinorGCSize = 20;
 
 char *heapStart;
 char *heapEnd;
-void *ptr;
 
 // DriverLoop接受的参数是一个可以直接执行的Closure
 void DriverLoop(Value call) {
+    stackTop = (char *)&call;
     // setjmp将当前上下文保存起来并返回0
     if (setjmp(empty_stack_state)) {
         call = saved_cont_call;
@@ -118,7 +119,7 @@ void EntryPoint(Value halt) {
 // --------------垃圾回收相关的一组函数--------------
 // 参数是一个vector，vector中第一个是closure，后面的是这个closure的参数
 static void _lambda_save_call(Value v) {
-    assert((((long)v & 7) == 0) && ((long)v->t == VECTOR));
+    assert((((Tag)v & 7) == 0) && (v->t == VECTOR));
     struct Vector *vec = (struct Vector *)v;
     assert(vec->size > 0);
     assert((((long)(vec->value[0]) & 7) == 0) && (((long)((struct Vector *)vec->value[0])->t) == CLOSURE));
@@ -161,7 +162,13 @@ void SaveCall(Lambda lam, int n, ...) {
     saved_cont_call = InitClosure(save, _lambda_save_call, (Value)vec);
 }
 
-int CheckMinorGC() { return 0; }
+int CheckMinorGC() {
+    char *ptr = (char *)&ptr;
+    if (stackTop - ptr > MinorGCSize) {
+        return 1;
+    }
+    return 0;
+}
 
 static int objectCount(Value obj) {
     if (((long)obj & 7) == 0) {
@@ -218,9 +225,22 @@ static void setSlot(Value obj, int i, Value v) {
 
 static int existsInStack(Value obj) { return (char *)obj <= stackTop && (char *)obj >= stackBottom; }
 
-static int isForwardingPtr(Value obj) { return 0; }
+static int isForwardingPtr(Value obj) { return ((long)obj & FORWARD_BIT) == 0; }
 
-static Value forwardingPtrTarget(Value obj) { return NULL; }
+static Value forwardingPtrTarget(Value obj) {
+    switch (((long)((struct Env *)obj)->t) & INTERMEDIA_TYPE_MASK) {
+    case CLOSURE:
+        return ((struct Closure *)obj)->env;
+    case CONS:
+        return ((struct Cons *)obj)->car;
+    case ENV:
+        return (Value)((struct Env *)obj)->value;
+    case VECTOR:
+        return (Value)((struct Vector *)obj)->value;
+    }
+    assert(0);
+    return NULL;
+}
 
 static int objectSize(Value obj) {
     switch ((long)obj) {
@@ -240,15 +260,19 @@ static int copyObject(Value obj, char *ptr) {
     switch ((long)obj) {
     case CLOSURE:
         *((struct Closure *)ptr) = *((struct Closure *)obj);
+        ((struct Closure *)obj)->env = (Value)ptr;
         return sizeof(struct Closure);
     case ENV:
         *((struct Env *)ptr) = *((struct Env *)obj);
+        ((struct Env *)obj)->value = (Value*)ptr;
         return sizeof(struct Env);
     case CONS:
         *((struct Cons *)ptr) = *((struct Cons *)obj);
+        ((struct Cons *)obj)->car = (Value)ptr;
         return sizeof(struct Cons);
     case VECTOR:
         *((struct Vector *)ptr) = *((struct Vector *)obj);
+        ((struct Vector *)obj)->value = (Value*)ptr;
         return sizeof(struct Vector);
     }
     assert(0);
@@ -258,6 +282,7 @@ void MinorGC() {
     int i, bytes, count;
     char *scanStart;
     Value obj, slot;
+    stackBottom = (char *)&i;
 
     struct Vector *vec = (struct Vector *)saved_cont_call;
     for (i = 0; i < vec->size; i++) {

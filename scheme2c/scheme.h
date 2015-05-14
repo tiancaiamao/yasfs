@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdarg.h>
+#include <stdint.h>  // for intptr_t
 
 // 001 fixnum
 // 000 pointer
@@ -20,7 +21,9 @@ typedef union Value_t* Value;
 #define ENV				 0x00400000L
 #define SYMBOL			 0x00500000L
 
-typedef void* Tag;
+#define FORWARD_BIT 0x10000000L
+
+typedef intptr_t Tag;
 typedef void (*Lambda)() ;
 
 struct Closure {
