@@ -6,6 +6,11 @@
 void lambda__tmp8534(Value env8527, Value rv$8526);
 Value fact;
 void lambda__tmp8533(Value env8528, Value n, Value k8525) {
+    printf("lambda__tmp8533中, n=%ld, 栈位置为%p\n", (Tag)n >> 1, &n);
+    if (CheckMinorGC()) {
+        SaveCall(lambda__tmp8533, 3, env8528, n, k8525);
+        MinorGC();
+    }
 
     struct Closure tmp8530;
     struct Env tmp8531;
@@ -19,6 +24,11 @@ void lambda__tmp8533(Value env8528, Value n, Value k8525) {
 }
 
 void lambda__tmp8534(Value env8527, Value rv$8526) {
+    printf("lambda__tmp8534中\n");
+    if (CheckMinorGC()) {
+        SaveCall(lambda__tmp8534, 2, env8527, rv$8526);
+        MinorGC();
+    }
 
     ((struct Closure *)EnvRef(MakeInt(0), env8527))->lam(((struct Closure *)EnvRef(MakeInt(0), env8527))->env, __product(EnvRef(MakeInt(1), env8527), rv$8526));
 }
@@ -28,10 +38,15 @@ void TopLevel(Value cont) {
         SaveCall(TopLevel, 1, cont);
         MinorGC();
     }
-    struct Closure tmp8529;
-    struct Env tmp8532;
-    tmp8532.value = alloca(sizeof(Value) * 1);
-    fact = InitClosure(&tmp8529, lambda__tmp8533, InitEnv(&tmp8532, 1, fact));
+	
+	// 全局变量的东西需要在堆上分配，因为MinorGC没有扫描全局变量
+    // struct Closure tmp8529;
+    // struct Env tmp8532;
+    struct Closure *tmp8529 = malloc(sizeof(struct Closure));
+    struct Env *tmp8532 = malloc(sizeof(struct Env));
+    tmp8532->value = malloc(sizeof(Value) * 1);
+    // tmp8532.value = alloca(sizeof(Value) * 1);
+    fact = InitClosure(tmp8529, lambda__tmp8533, InitEnv(tmp8532, 1, fact));
 
     ((struct Closure *)fact)->lam(((struct Closure *)fact)->env, MakeInt(5), cont);
 }

@@ -59,6 +59,7 @@ struct Cell {
 union Value_t {
   Tag t ;
   struct Closure clo ;
+  struct Vector vec;
   struct Env env ;
   struct Cons cons;
 };
