@@ -1,4 +1,4 @@
-(define (prim? x) (memq x '(+ - * / = or and void)))
+(define (prim? x) (memq x '(+ - * / = or and void set!)))
 (define (trivial? x) (or (number? x) (symbol? x) (string? x) (boolean? x)))
 (define (lambda? x) (and (pair? x) (eq? (car x) 'lambda)))
 (define (void) (begin))

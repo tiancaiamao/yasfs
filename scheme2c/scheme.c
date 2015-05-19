@@ -134,6 +134,9 @@ static void _lambda_save_call(Value v) {
 
     // 真的好ugly
     switch (vec->size) {
+	case 0:
+		clo->lam();
+		break;
     case 1:
         clo->lam(vec->value[1]);
         break;
