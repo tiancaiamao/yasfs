@@ -8,10 +8,13 @@
   (lambda (exp)
     (match exp
 	   [(? trivial?) exp]
-	   [('lambda (x ...) e)
+	   [('lambda (x ...) e ...)
 	    (let ((k$ (gensym 'k)))
 	      `(lambda (,@x ,k$)
-		 ,(T-c e k$)))])))
+		 ,(T-c (if (cdr e)
+			   (cons 'begin e)
+			   e)
+		       k$)))])))
 
 ;; sexp x label => sexp
 ;; set!不能实现为prim?，因为prim?在begin表达式中会被丢弃。而set!是有副作用的，不能丢弃。
@@ -100,3 +103,8 @@
 	      (lambda (rv$5141)
 		(k5140 (* n rv$5141)))))))
 ; (fact 5 halt) => 125
+
+(define-syntax set!/k
+  (syntax-rules ()
+    ((_ var val cont)
+     (cont (set! var val)))))

@@ -3,52 +3,53 @@
 #include "scheme.h"
 #include "assert.h"
 
-void lambda__tmp8534(Value env8527, Value rv$8526);
-Value fact;
-void lambda__tmp8533(Value env8528, Value n, Value k8525) {
-    printf("lambda__tmp8533中, n=%ld, 栈位置为%p\n", (Tag)n >> 1, &n);
+void lambda__tmp8586(Value env8585, Value fact, Value k8578);
+void lambda__tmp8589(Value env8584, Value rv$8579);
+void lambda__tmp8587(Value env8583, Value n, Value k8580);
+void lambda__tmp8588(Value env8582, Value rv$8581);
+
+void lambda__tmp8586(Value env8585, Value fact, Value k8578) {
     if (CheckMinorGC()) {
-        SaveCall(lambda__tmp8533, 3, env8528, n, k8525);
+        SaveCall(lambda__tmp8586, 3, env8585, fact, k8578);
         MinorGC();
     }
+    __set(&fact, ((struct Closure *)closure)->lam(((struct Closure *)closure)->env, lambda__tmp8587, env - make(MakeInt(1), fact)),
+          ((struct Closure *)closure)->lam(((struct Closure *)closure)->env, lambda__tmp8589, env - make(MakeInt(2), fact, k8578)));
+}
 
-    struct Closure tmp8530;
-    struct Env tmp8531;
-    tmp8531.value = alloca(sizeof(Value) * 2);
+void lambda__tmp8589(Value env8584, Value rv$8579) {
+    if (CheckMinorGC()) {
+        SaveCall(lambda__tmp8589, 2, env8584, rv$8579);
+        MinorGC();
+    }
+    ((struct Closure *)EnvRef(MakeInt(0), env8584))->lam(((struct Closure *)EnvRef(MakeInt(0), env8584))->env, MakeInt(5), EnvRef(MakeInt(1), env8584));
+}
+
+void lambda__tmp8587(Value env8583, Value n, Value k8580) {
+    if (CheckMinorGC()) {
+        SaveCall(lambda__tmp8587, 3, env8583, n, k8580);
+        MinorGC();
+    }
     if (ValueEqual(n, MakeInt(0)) == ValueTrue) {
-        ((struct Closure *)k8525)->lam(((struct Closure *)k8525)->env, MakeInt(1));
+        ((struct Closure *)k8580)->lam(((struct Closure *)k8580)->env, MakeInt(1));
     } else {
-        ((struct Closure *)fact)
-            ->lam(((struct Closure *)fact)->env, __sub(n, MakeInt(1)), InitClosure(&tmp8530, lambda__tmp8534, InitEnv(&tmp8531, 2, k8525, n)));
+        ((struct Closure *)EnvRef(MakeInt(0), env8583))
+            ->lam(((struct Closure *)EnvRef(MakeInt(0), env8583))->env, __sub(n, MakeInt(1)),
+                  ((struct Closure *)closure)->lam(((struct Closure *)closure)->env, lambda__tmp8588, env - make(MakeInt(2), k8580, n)));
     }
 }
 
-void lambda__tmp8534(Value env8527, Value rv$8526) {
-    printf("lambda__tmp8534中\n");
+void lambda__tmp8588(Value env8582, Value rv$8581) {
     if (CheckMinorGC()) {
-        SaveCall(lambda__tmp8534, 2, env8527, rv$8526);
+        SaveCall(lambda__tmp8588, 2, env8582, rv$8581);
         MinorGC();
     }
-
-    ((struct Closure *)EnvRef(MakeInt(0), env8527))->lam(((struct Closure *)EnvRef(MakeInt(0), env8527))->env, __product(EnvRef(MakeInt(1), env8527), rv$8526));
+    ((struct Closure *)EnvRef(MakeInt(0), env8582))->lam(((struct Closure *)EnvRef(MakeInt(0), env8582))->env, __product(EnvRef(MakeInt(1), env8582), rv$8581));
 }
 
 void TopLevel(Value cont) {
-    if (CheckMinorGC()) {
-        SaveCall(TopLevel, 1, cont);
-        MinorGC();
-    }
-	
-	// 全局变量的东西需要在堆上分配，因为MinorGC没有扫描全局变量
-    // struct Closure tmp8529;
-    // struct Env tmp8532;
-    struct Closure *tmp8529 = malloc(sizeof(struct Closure));
-    struct Env *tmp8532 = malloc(sizeof(struct Env));
-    tmp8532->value = malloc(sizeof(Value) * 1);
-    // tmp8532.value = alloca(sizeof(Value) * 1);
-    fact = InitClosure(tmp8529, lambda__tmp8533, InitEnv(tmp8532, 1, fact));
-
-    ((struct Closure *)fact)->lam(((struct Closure *)fact)->env, MakeInt(5), cont);
+    ((struct Closure *)((struct Closure *)closure)->lam(((struct Closure *)closure)->env, lambda__tmp8586, env - make(MakeInt(0))))
+        ->lam(((struct Closure *)((struct Closure *)closure)->lam(((struct Closure *)closure)->env, lambda__tmp8586, env - make(MakeInt(0))))->env, cont);
 }
 
 void lambda__c0(Value e, Value v) { printf("return = %ld\n", (long)v >> 1); }

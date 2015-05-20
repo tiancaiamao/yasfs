@@ -1,4 +1,4 @@
-(define (prim? x) (memq x '(+ - * / = env-get env-make)))
+(define (prim? x) (memq x '(+ - * / = env-get env-make set!/k)))
 
 (define split 
   (lambda (lst c)
@@ -8,12 +8,21 @@
      (else 
       (string-append (car lst) c (split (cdr lst) c))))))
 
+(define gc-guard-string
+  (lambda (func-name bind)
+    (string-append "if (CheckMinorGC()) {\nSaveCall("
+		   func-name ", " 
+		   (number->string (length bind))
+		   ", "
+		   (split (map symbol->string bind) ", ")
+		   ");\nMinorGC();\n}\n")))
+
 (define generate-lambda
   (lambda (bind body collect)
     (let* ((func-name (symbol->string (gensym 'lambda__tmp)))
 	   (declear (string-append "void " func-name "(" 
 				   (split (map (lambda (x) (string-append "Value " (symbol->string x))) bind) ", ") ")"))
-	   (def (string-append declear " {\n" (generate body) "\n}\n")))
+	   (def (string-append declear " {\n" (gc-guard-string func-name bind) (generate body) "\n}\n")))
       (collect func-name declear def))))
 
 (define global-funcs '())
@@ -39,6 +48,7 @@
 		  ['- "__sub"]
 		  ['* "__product"]
 		  ['env-get "EnvRef"]
+		  ['set!/k "__set"]
 		  [else (symbol->string exp)])
 		(symbol->string exp))]
 	   [`(if ,test ,then ,else)
@@ -164,9 +174,11 @@
 						  (cont `(InitClosure ,tmp ,lam$ ,env$)
 							(append (cons (list tmp 'CLOSURE 2) b1) b)))))))]
 	   [(rator rand ...)
-	    (explicit-alloc-list rand
-				 (lambda (rand$ bind)
-				   (cont `(,rator ,@rand$) bind)))])))
+	    (explicit-alloc rator
+			    (lambda (rator$ b1)
+			      (explicit-alloc-list rand
+						   (lambda (rand$ b2)
+						     (cont `(,rator$ ,@rand$) (append b1 b2))))))])))
 
 (define explicit-alloc-list
   (lambda (lst+ cont)

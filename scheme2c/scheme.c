@@ -78,10 +78,17 @@ Value ValueEqual(Value v1, Value v2) {
 
 Value __product(Value v1, Value v2) { return (Value)(((((Tag)v1 >> 1) * ((Tag)v2 >> 1)) << 1) | 0x1); }
 Value __sub(Value v1, Value v2) { return (Value)(((Tag)v1 - (Tag)v2) | 0x1); }
+void __set(Value *var, Value val, Value cont) {
+    *var = val;
+        ((struct Closure*)cont)->lam((struct Closure*)cont)->env, ValueVoid);
+}
+
 static void printValue(Value obj);
 
 Value ValueTrue = (Value)0xa;
 Value ValueFalse = (Value)0x2;
+Value ValueVoid = (Value)0xe;
+
 Value saved_cont_call;
 jmp_buf empty_stack_state;
 char *stackBottom;
@@ -134,9 +141,9 @@ static void _lambda_save_call(Value v) {
 
     // 真的好ugly
     switch (vec->size) {
-	case 0:
-		clo->lam();
-		break;
+    case 0:
+        clo->lam();
+        break;
     case 1:
         clo->lam(vec->value[1]);
         break;

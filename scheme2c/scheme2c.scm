@@ -1,16 +1,15 @@
 (define scheme2c
-  (lambda (exps)
+  (lambda (exp)
     (set! global-funcs '())
     (set! global-vars '())
-    (let ((content (map (lambda (exp)
-			  (generate
-			   (explicit-allocation
-			    (closure-convert 
-			     (T-c exp 'cont)))))
-			exps)))      
+    (let ((content   (generate
+		      (explicit-allocation
+		       (closure-convert 
+			(T-c 
+			 (lift-inner exp) 'cont))))))
       (map print global-vars)
       (map print global-funcs)
       (print (string-append "void TopLevel(Value cont) {\n"
 			    "CheckMinorGC(cont);\n"
-			    (split content "\n")
+			    content
 			    "}\n")))))
