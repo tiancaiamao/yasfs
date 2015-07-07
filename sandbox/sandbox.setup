@@ -1,0 +1,7 @@
+(compile -s -O3 -d1 "sandbox.scm" -j sandbox)
+(compile -s -O3 -d0 "sandbox.import.scm")
+
+(install-extension
+	'sandbox
+	'("sandbox.so" "sandbox.import.so")
+	'((version 1.0)))

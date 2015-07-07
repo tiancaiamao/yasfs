@@ -1,0 +1,9 @@
+((files "sandbox.setup"
+	"sandbox.scm"
+	"desugar.scm"
+	"eval.scm")
+ (license "BSD")
+ (author "Arthur Mao")
+ (synopsis "a sandbox environment"))
+	
+	
