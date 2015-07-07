@@ -13,7 +13,7 @@
 		     ,(desugar (caddr exp))
 		     ,(desugar (cadddr exp)))]
 	  [(set!) `(set! ,(cadr exp) ,(desugar (caddr exp)))]
-	  [(begin) `(begin ,(map desugar (cdr exp)))]
+	  [(begin) `(begin ,@(map desugar (cdr exp)))]
 	  [(lambda) `(lambda ,(cadr exp) ,@(map desugar (cddr exp)))]
 	  (else
 	   (let ([a (assq (car exp) my-macros)])
@@ -48,10 +48,10 @@
 (define (desugar-define exp desugar)
   (let ([head (cadr exp)]
 	[body (cddr exp)])
-    (if (not (pair? head))
-	`(set! ,head ,(desugar (car body)))
+    (if (pair? head)
 	(let* ([body1 `(lambda ,(cdr head) ,@body)])
-	  `(set! ,(car head) ,(desugar body1)) ) ) ))
+	  `(define ,(car head) ,(desugar body1)) )
+	`(define ,head ,(desugar (car body))))))
 
 (define (desugar-and exp desugar)
   (if (null? (cdr exp))
