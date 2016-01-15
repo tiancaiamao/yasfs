@@ -29,20 +29,49 @@
 (define (OP_LEN	A B)	(format "R(~a) := length of R(~a)" A B))
 (define (OP_CONCAT	A B C)	(format "R(~a) := R(~a).. ... ..R(~a)" A B C))
 (define (OP_JMP	A sBx)	(format "pc+=~a; if (~a) close all upvalues >= R(~a)" sBx A (- A 1)))
-(define (OP_EQ	A B C)	(format "if ((RK(~a) == RK(~a)) ~= ~a) then pc++" B C A))
-(define (OP_LT	A B C)	(format "if ((RK(~a) <  RK(~a)) ~= ~a) then pc++" B C A))
-(define (OP_LE	A B C)	(format "if ((RK(~a) <= RK(~a)) ~= ~a) then pc++" B C A))
+(define (OP_EQ	A B C)	(format "if ((RK(~a) == RK(~a)) ~~= ~a) then pc++" B C A))
+(define (OP_LT	A B C)	(format "if ((RK(~a) <  RK(~a)) ~~= ~a) then pc++" B C A))
+(define (OP_LE	A B C)	(format "if ((RK(~a) <= RK(~a)) ~~= ~a) then pc++" B C A))
 (define (OP_TEST	A C)	(format "if not (R(~a) <=> ~a) then pc++" A C))
 (define (OP_TESTSET	A B C)	(format "if (R(~a) <=> ~a) then R(~a) := R(~a) else pc++" B C A B))
 (define (OP_CALL	A B C)	(format "R(~a), ... ,R(~a) := R(~a)(R(~a), ... ,R(~a))" A (- (+ A C) 2) A (+ A 1) (- (+ A B) 1)))
 (define (OP_TAILCALL	A B C)	(format "return R(A)(R(A+1), ... ,R(A+B-1))" A (+ A 1) (+ (+ A B) 1)))
 (define (OP_RETURN	A B)	(format "return R(~a), ... ,R(~a)" A (- (+ A B) 2)))
 (define (OP_FORLOOP	A sBx)	(format "R(~a)+=R(~a);
-			if R(~a) <?= R(~a) then { pc+=~a; R(~a)=R(~a) }" A (+ A 2) A (+ A 1) sBx (+ A 3) A))
+      if R(~a) <?= R(~a) then { pc+=~a; R(~a)=R(~a) }" A (+ A 2) A (+ A 1) sBx (+ A 3) A))
 (define (OP_FORPREP	A sBx)	(format "R(~a)-=R(~a); pc+=~a" A (+ A 2) sBx))
 (define (OP_TFORCALL	A C)	(format "R(~a), ... ,R(~a) := R(~a)(R(~a), R(~a));" (+ A 3) (+ A C 2) A (+ A 1) (+ A 2)))
-(define (OP_TFORLOOP	A sBx)	(format "if R(~a) ~= nil then { R(~a)=R(~a); pc += ~a }" (+ A 1) A (+ A 1) sBx))
+(define (OP_TFORLOOP	A sBx)	(format "if R(~a) ~~= nil then { R(~a)=R(~a); pc += ~a }" (+ A 1) A (+ A 1) sBx))
 (define (OP_SETLIST	A B C)	(format "R(~a)[~a*FPF+i] := R(~a+i), 1 <= i <= ~a" A (- C 1) A B))
 (define (OP_CLOSURE	A Bx)	(format "R(~a) := closure(KPROTO[~a])" A Bx))
 (define (OP_VARARG	A B)	(format "R(~a), R(~a), ..., R(~a) = vararg" A (+ A 1) (- (+ A B) 2)))
 (define (OP_EXTRAARG	Ax)	(format "extra (larger) argument for previous opcode ~a" Ax))
+
+(define table
+  #((OP_MOVE . 2) (OP_LOADK . 2) (OP_LOADKX . 1) (OP_LOADBOOL . 3) (OP_LOADNIL . 2) (OP_GETUPVAL . 2) (OP_GETTABUP . 3) (OP_GETTABLE . 3) (OP_SETTABUP . 3) (OP_SETUPVAL . 2) (OP_SETTABLE . 3) (OP_NEWTABLE . 3) (OP_SELF . 3) (OP_ADD . 3) (OP_SUB . 3) (OP_MUL . 3) (OP_MOD . 3) (OP_POW . 3) (OP_DIV . 3) (OP_IDIV . 3) (OP_BAND . 3) (OP_BOR . 3) (OP_BXOR . 3) (OP_SHL . 3) (OP_SHR . 3) (OP_UNM . 2) (OP_BNOT . 2) (OP_NOT . 2) (OP_LEN . 2) (OP_CONCAT . 3) (OP_JMP . 2) (OP_EQ . 3) (OP_LT . 3) (OP_LE . 3) (OP_TEST . 2) (OP_TESTSET . 3) (OP_CALL . 3) (OP_TAILCALL . 3) (OP_RETURN . 2) (OP_FORLOOP . 2) (OP_FORPREP . 2) (OP_TFORCALL . 2) (OP_TFORLOOP . 2) (OP_SETLIST . 3) (OP_CLOSURE . 2) (OP_VARARG . 2) (OP_EXTRAARG . 1)))
+
+(define get-opcode (lambda (x) (bitwise-and x 63)))
+(define getarg-a (lambda (x) (bitwise-and (arithmetic-shift x -6) 255)))
+(define getarg-b (lambda (x) (bitwise-and (arithmetic-shift x -14) 511)))
+(define getarg-c (lambda (x) (arithmetic-shift x -23)))
+
+(define disassemble
+  (lambda (x)
+    (let ([op (get-opcode x)]
+          [a (getarg-a x)]
+          [b (getarg-b x)]
+          [c (getarg-c x)])
+      (let* ([opdesc (vector-ref table op)]
+             [fn (eval (car opdesc))]
+             [num (cdr opdesc)])
+        (cond
+         ((= num 0) (fn))
+         ((= num 1) (fn a))
+         ((= num 2) (fn a b))
+         ((= num 3) (fn a b c)))))))
+
+(define input #(4194335 2147500062 16449 16777318 4227142 4210830 16810084 16463 16777318 8388646))
+(map (lambda (x)
+       (display (disassemble x))
+       (newline))
+     (vector->list input))
