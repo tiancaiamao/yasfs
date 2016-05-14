@@ -1236,6 +1236,8 @@ apply(object_t fn, object_t args, object_t cont) {
       return sys_error(12);
     }
 
+    // 对spawn resume yield特殊处理一下
+
     switch (priv->arg_num) {
     case 0:
       return apply_cont(cont, priv->func.op0());
@@ -1281,6 +1283,26 @@ make_call_cont(object_t args, object_t env, object_t cont) {
   fcc->cont = cont;
   fcc->args = args;
   return (object_t)fcc;
+}
+
+struct spawn_cont {
+  struct object_head head;
+  enum cont_type type;
+  object_t proc;
+};
+
+object_t
+make_spawn_cont(object_t proc, object_t env) {
+  struct spawn_cont *sc = malloc(sizeof(*sc));
+  sc->head.type = OBJ_CONTINUATION;
+  sc->type = SPAWN_CONT;
+  sc->env = env;
+  return (object_t)sc;
+}
+
+object_t
+__spawn_cont(struct spawn_cont* sc, object_t value) {
+  return apply(sc->func, scheme_null, cc);
 }
 
 object_t
@@ -1429,6 +1451,7 @@ scheme_init_env() {
   object_t _eq = cons_op(make_symbol("eq?"), make_primitive("eq?", 2, eq_op));
   object_t _sub = cons_op(make_symbol("-"), make_primitive("-", 2, sub_op));
   object_t _mul = cons_op(make_symbol("*"), make_primitive("*", 2, mul_op));
+  object_t _spawn = cons_op(make_symbol("spawn"), make_primitive("spawn", 1, builtin_spawn));
 
   object_t l = scheme_null;
   l = cons_op(_if, l);
@@ -1441,8 +1464,25 @@ scheme_init_env() {
   l = cons_op(_eq, l);
   l = cons_op(_sub, l);
   l = cons_op(_mul, l);
+  l = cons_op(_spawn, l);
 
   return cons_op(l, scheme_null);
+}
+
+object_t
+builtin_spawn(object_t proc) {
+  return make_spawn_cont(proc);
+}
+
+object_t
+builtin_resume(object_t co, object_t val, object_t _cc) {
+  cc = _cc;
+  return apply_cont(co, val);
+}
+
+object_t
+builtin_yield(object_t val) {
+  return apply_cont(cc, val);
 }
 
 int
