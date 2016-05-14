@@ -1,0 +1,10 @@
+scheme解释器，宿主语言为C
+
+(eval exp env cont)
+
+支持基本if begin set lambda define let几个syntax
+
+builtin函数: + - * eq? 
+
+    gcc main.c mpc.c -o a.out
+    ./a.out
