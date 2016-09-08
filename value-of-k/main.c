@@ -110,6 +110,7 @@ enum cont_type {
   ARG_CONT,
   LET_CONT,
   PROCEDURE_CALL_CONT,
+  SPAWN_CONT,
 };
 
 struct continuation {
