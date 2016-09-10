@@ -1,3 +1,6 @@
+{
+        open Parser
+}
 let space = [' ' '\t' '\r']
 let newline = ['\n']
 let digit = ['0'-'9']
@@ -6,7 +9,7 @@ let upper = ['A'-'Z']
 
 rule token = parse
 | newline
-    { NEWLINE }
+    { EOL }
 | space+
     { token lexbuf }
 | '('

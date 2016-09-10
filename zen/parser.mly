@@ -1,5 +1,5 @@
 %{
-open Syntax
+        open Ast
 %}
 
 %token ARROW
@@ -16,10 +16,9 @@ open Syntax
 %token IF
 %token THEN
 %token ELSE
-%token <Id.t> IDENT
+%token <string> IDENT
 %token LET
 %token FN
-%token NEWLINE
 %token IN
 %token REC
 %token COMMA
@@ -29,7 +28,7 @@ open Syntax
 %token SEMICOLON
 %token LPAREN
 %token RPAREN
-%token EOF
+%token EOF EOL
 
 %right prec_let
 %right SEMICOLON
@@ -42,7 +41,7 @@ open Syntax
 %left prec_app
 %left DOT
 
-%type <Syntax.t> exp
+%type <Ast.t> exp
 %start exp
 
 %%
@@ -60,21 +59,9 @@ exp:
     { $1 }
 | exp PLUS exp
     { Add($1, $3) }
-| exp EQUAL exp
-    { Eq($1, $3) }
-| exp NOT_EQUAL exp
-    { Not(Eq($1, $3)) }
-| exp LESS exp
-    { Not(LE($3, $1)) }
-| exp GREATER exp
-    { Not(LE($1, $3)) }
-| exp LESS_EQUAL exp
-    { LE($1, $3) }
-| exp GREATER_EQUAL exp
-    { LE($3, $1) }
 | FN formal_args ARROW exp
-    { FUN($2, $4) }
-| IDENT BIND exp NEWLINE exp
+    { Fun($2, $4) }
+| IDENT BIND exp EOL exp
     { Let($1, $3, $5) }
 | exp actual_args
     %prec prec_app
@@ -85,15 +72,11 @@ exp:
            (Parsing.symbol_start ())
            (Parsing.symbol_end ())) }
 
-fundef:
-| IDENT formal_args EQUAL exp
-    { { name = addtyp $1; args = $2; body = $4 } }
-
 formal_args:
 | IDENT formal_args
-    { addtyp $1 :: $2 }
+    { Var($1)::$2 }
 | IDENT
-    { [addtyp $1] }
+    { [Var($1)] }
 
 actual_args:
 | actual_args simple_exp
