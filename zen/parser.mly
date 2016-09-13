@@ -7,39 +7,14 @@
 %token BIND
 %token <int> INT
 %token PLUS
-%token EQUAL
-%token NOT_EQUAL
-%token LESS_EQUAL
-%token GREATER_EQUAL
-%token LESS
-%token GREATER
-%token IF
-%token THEN
-%token ELSE
 %token <string> IDENT
-%token LET
 %token FN
-%token IN
-%token REC
-%token COMMA
-%token ARRAY_CREATE
-%token DOT
-%token LESS_MINUS
-%token SEMICOLON
 %token LPAREN
 %token RPAREN
-%token EOF EOL
+%token EOL
+%token EOF
 
-%right prec_let
-%right SEMICOLON
-%right prec_if
-%right LESS_MINUS
-%left COMMA
-%left EQUAL NOT_EQUAL LESS GREATER LESS_EQUAL GREATER_EQUAL
 %left PLUS
-%right prec_unary_minus
-%left prec_app
-%left DOT
 
 %type <Ast.t> exp
 %start exp
@@ -64,7 +39,6 @@ exp:
 | IDENT BIND exp EOL exp
     { Let($1, $3, $5) }
 | exp actual_args
-    %prec prec_app
     { App($1, $2) }
 | error
     { failwith
@@ -80,8 +54,6 @@ formal_args:
 
 actual_args:
 | actual_args simple_exp
-    %prec prec_app
     { $1 @ [$2] }
 | simple_exp
-    %prec prec_app
     { [$1] }

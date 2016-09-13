@@ -20,40 +20,14 @@ rule token = parse
     { INT(int_of_string (Lexing.lexeme lexbuf)) }
 | '+'
     { PLUS }
-| '='
-    { EQUAL }
-| "!="
-    { NOT_EQUAL }
-| "<="
-    { LESS_EQUAL }
-| ">="
-    { GREATER_EQUAL }
-| '<'
-    { LESS }
-| '>'
-    { GREATER }
 | "->"
     { ARROW }
 | "=>"
     { ARROW2 }
-| "if"
-    { IF }
-| "then"
-    { THEN }
-| "else"
-    { ELSE }
 | "fn"
     { FN }
 | ":="
     { BIND }
-| "rec"
-    { REC }
-| ','
-    { COMMA }
-| '.'
-    { DOT }
-| ';'
-    { SEMICOLON }
 | eof
     { EOF }
 | lower (digit|lower|upper|'_')*

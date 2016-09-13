@@ -12,10 +12,8 @@ lexer.cmo:lexer.ml
 lexer.ml:lexer.mll
 	ocamllex lexer.mll
 
-parser.ml : parser.mly
+parser.ml parser.mli : parser.mly
 	ocamlyacc parser.mly
-
-parser.mli : parser.mly
 
 parser.cmi: parser.mli ast.cmo
 	ocamlc -c parser.mli
