@@ -17,14 +17,17 @@ end
 module Instruct = struct
   type t =
       Const of int
-    | Access of int
+    | StackAccess of int
+    | EnvAccess of int
     | Closure of t list
     | Grab
     | Return
+    | Restart
     | Endlet
     | Let
     | Apply
-    | Pushretaddr of int
+    | TailApply
+    | Pushretaddr of t list
     | Stop
 end
 
@@ -49,11 +52,21 @@ let rec ast2lambda env ast = match ast with
 
 let rec compile exp code = match exp with
     Lambda.Int v -> (Instruct.Const v)::code
-  | Lambda.Var n -> (Instruct.Access n)::code
-  | Lambda.Fun (n,t) -> (Instruct.Closure (compile t [Instruct.Return]))::code
+  | Lambda.Var n -> (Instruct.EnvAccess n)::code
+  | Lambda.Fun (n,t) -> (Instruct.Closure (compile_tail exp n))::code
   | Lambda.App (t,ts) ->
-    let body = ts |> List.map (fun x -> compile x []) |> List.flatten in
-    compile t (body @ Instruct.Apply::code)
+    let body = ts |> List.rev |> List.map (fun x -> compile x []) |> List.flatten in
+    (Instruct.Pushretaddr code)::(body @ (compile t [Instruct.TailApply]))
+and compile_tail exp threshold = match exp with
+    Lambda.Int v -> [Instruct.Const v]
+  | Lambda.Var n ->
+    let access = if n < threshold then Instruct.StackAccess n else Instruct.EnvAccess n in
+    [access; Instruct.Return]
+  | Lambda.Fun (n,t) -> Instruct.Grab::(compile_tail t n)
+  | Lambda.App (t,ts) ->
+    let fold_func code exp = compile exp code in
+    let rev_ts = List.rev ts in
+    List.fold_left fold_func (compile t [Instruct.TailApply]) rev_ts
 
 type result =
     Value of int
@@ -69,7 +82,7 @@ let rec run code e s =
   | x::c -> match x with
       Instruct.Stop -> Stack.top s
     | Instruct.Const v -> Stack.push (Value v) s; run c e s
-    | Instruct.Access n -> Stack.push (env_get e n) s; run c e s
+    | Instruct.StackAccess n -> Stack.push (env_get e n) s; run c e s
     | Instruct.Closure c1 -> Stack.push (Lambda (c1,e)) s; run c e s
     | Instruct.Apply ->
       let v = Stack.pop s in
@@ -87,6 +100,6 @@ let rec run code e s =
       run c1 e1 s
     | _ -> failwith "not implement"
 
-let input0 = (Lambda.App ((Lambda.Fun (1,Lambda.Var 0)), [(Lambda.Int 5)]));;
-let input1 = compile input0 [Instruct.Stop];;
-let output = run input1 [] (Stack.create ());;
+(* let input0 = (Lambda.App ((Lambda.Fun (1,Lambda.Var 0)), [(Lambda.Int 5)]));; *)
+(* let input1 = compile input0 [Instruct.Stop];; *)
+(* let output = run input1 [] (Stack.create ());; *)
