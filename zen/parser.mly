@@ -32,12 +32,8 @@ simple_exp:
 exp:
 | simple_exp
     { $1 }
-| exp PLUS exp
-    { Add($1, $3) }
 | FN formal_args ARROW exp
     { Fun($2, $4) }
-| IDENT BIND exp EOL exp
-    { Let($1, $3, $5) }
 | exp actual_args
     { App($1, $2) }
 | error
@@ -48,9 +44,9 @@ exp:
 
 formal_args:
 | IDENT formal_args
-    { Var($1)::$2 }
+    { $1::$2 }
 | IDENT
-    { [Var($1)] }
+    { [$1] }
 
 actual_args:
 | actual_args simple_exp
