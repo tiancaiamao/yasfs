@@ -56,7 +56,9 @@ let rec compile exp code = match exp with
 and compile_tail exp = match exp with
     Lambda.Int v -> [Instruct.Const v]
   | Lambda.Var n -> [Instruct.Access n; Instruct.Return]
-  | Lambda.Fun (n,t) -> Instruct.Grab::(compile_tail t)
+  | Lambda.Fun (n,t) -> (match n with
+      0 -> (compile_tail t)
+    | _ -> Instruct.Grab::(compile_tail (Lambda.Fun (n-1,t))))
   | Lambda.App (t,ts) ->
     (t::ts
      |> List.rev
@@ -126,7 +128,7 @@ let run code e s r =
 
 let easy_run code = run code [] (Stack.create ()) (Stack.create ())
 
-let input0 = Lambda.App ((Lambda.Fun (1,Lambda.Var 0)), [Lambda.Int 3])
+let input0 = Lambda.App ((Lambda.Fun (2,Lambda.Var 1)), [Lambda.Int 3; Lambda.Int 5])
 
 let s0 = compile input0 [Instruct.Stop]
 
