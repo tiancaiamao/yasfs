@@ -98,8 +98,7 @@ let step (c, e, s, r) op =
            | _ -> failwith "should be closure in r" in
         (c1, e1, s, r)))
     else let v = Stack.pop s in
-      Stack.push v r;
-      (c, e, s, r)
+      (c, (env_put e v), s, r)
   | Instruct.Return ->
     let v = Stack.pop s in
     (if Stack.top s = Eplison then
@@ -113,14 +112,24 @@ let step (c, e, s, r) op =
       | _ -> failwith "should be")
   | _ -> failwith "not implement"
 
-let run code e s r =
-let rec loop (c, e, s, r) =
-  match c with
-  | [] -> failwith "must stop with Instruct.Stop"
-  | [Instruct.Stop] -> Stack.top s
-  | op::c1 -> loop (step (c1, e, s, r) op)
-in loop (code, e, s, r)
+let step1 ((op::c), e, s, r) = step (c, e, s, r) op
 
-let input0 = Lambda.App ((Lambda.App ((Lambda.Fun (2,Lambda.Var 1)), [Lambda.Int 3])), [Lambda.Int 5]);;
+let state c = (c, [], (Stack.create ()), (Stack.create ()))
+
+let run code e s r =
+  let rec loop (c, e, s, r) =
+    match c with
+    | [] -> failwith "must stop with Instruct.Stop"
+    | [Instruct.Stop] -> Stack.top s
+    | op::c1 -> loop (step (c1, e, s, r) op)
+  in loop (code, e, s, r)
+
+let easy_run code = run code [] (Stack.create ()) (Stack.create ())
+
+let input0 = Lambda.App ((Lambda.Fun (1,Lambda.Var 0)), [Lambda.Int 3])
+
+let s0 = compile input0 [Instruct.Stop]
+
+(* let input0 = Lambda.App ((Lambda.App ((Lambda.Fun (2,Lambda.Var 1)), [Lambda.Int 3])), [Lambda.Int 5]);; *)
 (* let input1 = compile input0 [Instruct.Stop];; *)
 (* let output = run input1 [] (Stack.create ());; *)
