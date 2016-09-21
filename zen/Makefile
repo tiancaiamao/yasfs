@@ -1,4 +1,4 @@
-.PHONY: all lib clean
+.PHONY: all lib clean test
 .SUFFIXES: .mli .mll .mly .ml .cmo .cmi .cmx
 .ml.cmo:
 	ocamlc -c $(OFLAGS) $(INCLUDES) $<
@@ -15,8 +15,18 @@
 
 all: lib
 
-lib : ast.cmo lambda.cmo instruct.cmo lexer.cmo parser.cmo bruijn.cmo zinc.cmo driver.cmo
+lib:zen.cma
+
+zen.cma : ast.cmo lambda.cmo instruct.cmo lexer.cmo parser.cmo bruijn.cmo zinc.cmo driver.cmo
 	ocamlc -o zen.cma -a $^
+
+test : zinc_test driver_test
+
+zinc_test: zen.cma
+	ocaml zen.cma zinc_test.ml
+
+driver_test: zen.cma
+	ocaml zen.cma driver_test.ml
 
 bruijn.cmo: bruijn.ml lambda.cmo
 
