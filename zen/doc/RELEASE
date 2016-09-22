@@ -1,0 +1,9 @@
+# Release Notes
+
+## v0.0.1
+
+一句话描述：实现了最基础的lambda演算，支持partial apply
+
+语法支持int常量，变量，匿名函数，调用函数
+
+基础的ZINC虚拟机，支持Access Grab Pushmark Closure Return Tailapply Apply几条指令
