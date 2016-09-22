@@ -5,7 +5,7 @@ let find_env e v =
     | x::xs -> if x = v then Some(i) else find xs v (i+1)
   in find e v 0
 
-let extend_env env v = v @ env
+let extend_env env v = (List.rev v) @ env
 
 let (empty_env : string list) = []
 
