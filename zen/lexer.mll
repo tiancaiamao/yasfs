@@ -26,12 +26,20 @@ rule token = parse
     { INT(int_of_string (Lexing.lexeme lexbuf)) }
 | '+'
     { PLUS }
+| '='
+    { EQUAL }
 | "->"
     { ARROW }
 | "=>"
     { ARROW2 }
 | "fn"
     { FN }
+| "if"
+    { IF }
+| "then"
+    { THEN }
+| "else"
+    { ELSE }
 | ":="
     { BIND }
 | eof

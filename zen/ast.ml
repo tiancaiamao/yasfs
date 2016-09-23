@@ -5,3 +5,4 @@ type t =
   | Fun of string list * t list
   | Bind of string * t
   | Plus of t * t
+  | Equal of t * t

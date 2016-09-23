@@ -18,11 +18,14 @@ let rec compile exp code = match exp with
     Instruct.Pushmark::(List.fold_left (fun a b -> compile b a) init ts)
   | Lambda.Plus (a, b) ->
     compile a (compile b (Instruct.Plus::code))
+  | Lambda.Equal (a, b) ->
+    compile a (compile b (Instruct.Equal::code))
 and compile_tail exp = match exp with
     Lambda.Int v -> [Instruct.Const v]
   | Lambda.Var n -> [Instruct.Access n; Instruct.Return]
   | Lambda.Bind t -> [Instruct.Bind]
   | Lambda.Plus (a,b) -> compile exp [Instruct.Return]
+  | Lambda.Equal (a,b) -> compile exp [Instruct.Return]
   | Lambda.Fun (n,ts) -> (match ts with
     | [t] -> (match n with
         | 0 -> compile_tail t
@@ -45,6 +48,7 @@ and compile_body ts = match ts with
 
 type result =
     Value of int
+  | Bool of bool
   | Lambda of (Instruct.t list * result list)
   | Eplison
 
@@ -59,6 +63,12 @@ let step (c, e, s, r) op =
   | Instruct.Plus -> (match Stack.pop s with
     | Value x -> (match Stack.pop s with
         | Value y -> Stack.push (Value (x+y)) s;
+          (c, e, s, r)
+        | _ -> failwith "can add non int")
+    | _ -> failwith "can add non int")
+  | Instruct.Equal -> (match Stack.pop s with
+    | Value x -> (match Stack.pop s with
+        | Value y -> Stack.push (Bool (if x=y then true else false)) s;
           (c, e, s, r)
         | _ -> failwith "can add non int")
     | _ -> failwith "can add non int")

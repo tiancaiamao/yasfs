@@ -24,6 +24,9 @@ let test_plus () =
 let test_plus1 () =
   (eval "(fn x y -> x + y) 3 5") = (Value 8)
 
+let test_bool () =
+  ((eval "1=1") = (Bool true)) && ((eval "1=2") = (Bool false))
+
 let tests = [
   ("identity", test_identity);
   ("multi_argument", test_multi_argument);

@@ -21,4 +21,6 @@ let rec ast2lambda env ast = match ast with
     | None -> failwith "cannot handle free variable")
   | Ast.Plus (t1, t2) -> Lambda.Plus (
     (ast2lambda env t1), (ast2lambda env t2))
+  | Ast.Equal (t1, t2) -> Lambda.Equal (
+    (ast2lambda env t1), (ast2lambda env t2))
   | Ast.Bind (n, t) -> ast2lambda (extend_env env [n]) t

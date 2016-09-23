@@ -6,3 +6,4 @@ type t =
   | Fun1 of int * t list
   | Bind of t
   | Plus of t * t
+  | Equal of t * t

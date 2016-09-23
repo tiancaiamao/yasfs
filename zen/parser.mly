@@ -13,6 +13,10 @@
 %token RPAREN
 %token LBRACE
 %token RBRACE
+%token IF
+%token THEN
+%token ELSE
+%token EQUAL
 %token EOL
 %token EOF
 %token SEMICOLON
@@ -48,6 +52,8 @@ exp:
     { App($1, $2) }
 | exp PLUS exp
     { Plus($1, $3) }
+| exp EQUAL exp
+    { Equal($1, $3) }
 | IDENT BIND exp
     { Bind($1, $3) }
 | error

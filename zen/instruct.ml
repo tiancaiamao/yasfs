@@ -11,3 +11,4 @@ type t =
   | Stop
   | Bind
   | Plus
+  | Equal
