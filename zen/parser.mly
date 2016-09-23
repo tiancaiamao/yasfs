@@ -54,6 +54,8 @@ exp:
     { Plus($1, $3) }
 | exp EQUAL exp
     { Equal($1, $3) }
+| IF exp THEN exp ELSE exp
+    { If($2, $4, $6) }
 | IDENT BIND exp
     { Bind($1, $3) }
 | error

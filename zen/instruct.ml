@@ -9,6 +9,7 @@ type t =
   | Grab
   | Return
   | Stop
+  | Branch of t list * t list
   | Bind
   | Plus
   | Equal

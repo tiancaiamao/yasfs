@@ -27,6 +27,9 @@ let test_plus1 () =
 let test_bool () =
   ((eval "1=1") = (Bool true)) && ((eval "1=2") = (Bool false))
 
+let test_if_then_else () =
+  (eval "if 1=1 then 5 else 2") = (Value 5)
+
 let tests = [
   ("identity", test_identity);
   ("multi_argument", test_multi_argument);
@@ -34,6 +37,7 @@ let tests = [
   ("variable_bind", test_variable_bind);
   ("test_plus", test_plus);
   ("test_plus1", test_plus1);
+  ("test_if_then_else", test_if_then_else);
   (* ("factorial", test_factorial); *)
 ]
 

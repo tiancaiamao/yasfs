@@ -16,6 +16,8 @@ let rec compile exp code = match exp with
   | Lambda.App (t,ts) ->
     let init = compile t (Instruct.Apply::code) in
     Instruct.Pushmark::(List.fold_left (fun a b -> compile b a) init ts)
+  | Lambda.If (t, succ, fail) ->
+    compile t [Instruct.Branch ((compile succ code), (compile fail code))]
   | Lambda.Plus (a, b) ->
     compile a (compile b (Instruct.Plus::code))
   | Lambda.Equal (a, b) ->
@@ -24,8 +26,9 @@ and compile_tail exp = match exp with
     Lambda.Int v -> [Instruct.Const v]
   | Lambda.Var n -> [Instruct.Access n; Instruct.Return]
   | Lambda.Bind t -> [Instruct.Bind]
-  | Lambda.Plus (a,b) -> compile exp [Instruct.Return]
-  | Lambda.Equal (a,b) -> compile exp [Instruct.Return]
+  | Lambda.Plus _ -> compile exp [Instruct.Return]
+  | Lambda.Equal _ -> compile exp [Instruct.Return]
+  | Lambda.If _ -> compile exp [Instruct.Return]
   | Lambda.Fun (n,ts) -> (match ts with
     | [t] -> (match n with
         | 0 -> compile_tail t
@@ -72,6 +75,12 @@ let step (c, e, s, r) op =
           (c, e, s, r)
         | _ -> failwith "can add non int")
     | _ -> failwith "can add non int")
+  | Instruct.Branch (succ, fail) ->
+    (match Stack.pop s with
+     | Bool x -> if x then
+         (succ, e, s, r)
+       else (fail, e, s, r)
+     | _ -> failwith "branch instruct expect bool type")
   | Instruct.Access n -> Stack.push (env_get e n) s; (c, e, s, r)
   | Instruct.Closure c1 -> Stack.push (Lambda (c1,e)) s; (c, e, s, r)
   | Instruct.Tailapply ->

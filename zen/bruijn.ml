@@ -24,3 +24,5 @@ let rec ast2lambda env ast = match ast with
   | Ast.Equal (t1, t2) -> Lambda.Equal (
     (ast2lambda env t1), (ast2lambda env t2))
   | Ast.Bind (n, t) -> ast2lambda (extend_env env [n]) t
+  | Ast.If (test, succ, fail) -> Lambda.If (
+    (ast2lambda env test), (ast2lambda env succ), (ast2lambda env fail))
