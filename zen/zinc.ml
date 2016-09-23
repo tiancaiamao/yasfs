@@ -8,6 +8,9 @@ let rec compile exp code = match exp with
   | Lambda.Var n -> (Instruct.Access n)::code
   | Lambda.Bind t -> compile t (Instruct.Bind::code)
   | Lambda.Fun (n,ts) ->
+    let body = Instruct.Pop::(repeat n Instruct.Grab) @ (compile_body ts) in
+        (Instruct.Closure body)::code
+  | Lambda.Fun1 (n,ts) ->
     let body = (repeat n Instruct.Grab) @ (compile_body ts) in
         (Instruct.Closure body)::code
   | Lambda.App (t,ts) ->
@@ -18,6 +21,11 @@ and compile_tail exp = match exp with
   | Lambda.Var n -> [Instruct.Access n; Instruct.Return]
   | Lambda.Bind t -> [Instruct.Bind]
   | Lambda.Fun (n,ts) -> (match ts with
+    | [t] -> (match n with
+        | 0 -> compile_tail t
+        | _ -> Instruct.Pop::Instruct.Grab::(compile_tail (Lambda.Fun (n-1,[t]))))
+    | _ -> failwith "must be one")
+  | Lambda.Fun1 (n,ts) -> (match ts with
     | [t] -> (match n with
         | 0 -> compile_tail t
         | _ -> Instruct.Grab::(compile_tail (Lambda.Fun (n-1,[t]))))
@@ -44,16 +52,17 @@ let env_put (e : result list) v = v :: e
 let step (c, e, s, r) op =
   match op with
     Instruct.Const v -> Stack.push (Value v) s; (c, e, s, r)
+  | Instruct.Pop -> Stack.pop s |> ignore; (c, e, s, r)
   | Instruct.Access n -> Stack.push (env_get e n) s; (c, e, s, r)
   | Instruct.Closure c1 -> Stack.push (Lambda (c1,e)) s; (c, e, s, r)
   | Instruct.Tailapply ->
-    let (c1,e1) = match Stack.pop s with
+    let (c1,e1) = match Stack.top s with
         Lambda x -> x
       | _ -> failwith "cannot tailapply with non closure" in
     (c1, e1, s, r)
   | Instruct.Apply ->
     Stack.push (Lambda (c,e)) r;
-    let (c1,e1) = match Stack.pop s with
+    let (c1,e1) = match Stack.top s with
         Lambda x -> x
       | _ -> failwith "cannot apply non closure" in
     (c1, e1, s, r)

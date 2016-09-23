@@ -5,6 +5,7 @@ type t =
   | Tailapply
   | Apply
   | Pushmark
+  | Pop
   | Grab
   | Return
   | Stop

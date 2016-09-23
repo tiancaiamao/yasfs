@@ -2,14 +2,14 @@ open Zinc
 
 let test_identity () =
   compile (Lambda.Fun (1, [Lambda.Var 0])) [] =
-  [Instruct.Closure [Instruct.Grab; Instruct.Access 0; Instruct.Return]]
+  [Instruct.Closure [Instruct.Pop; Instruct.Grab; Instruct.Access 0; Instruct.Return]]
 
 let test_basic_apply () =
-  compile (Lambda.App (Lambda.Fun (1, [Lambda.Var 42]), [Lambda.Int 42])) [] = [Instruct.Pushmark; Instruct.Const 42; Instruct.Closure [Instruct.Grab; Instruct.Access 42; Instruct.Return];
+  compile (Lambda.App (Lambda.Fun (1, [Lambda.Var 42]), [Lambda.Int 42])) [] = [Instruct.Pushmark; Instruct.Const 42; Instruct.Closure [Instruct.Pop; Instruct.Grab; Instruct.Access 42; Instruct.Return];
                                                                                 Instruct.Apply]
 
 let test_multi_argument () =
-  compile (Lambda.Fun (2, [Lambda.Var 1])) [] = [Instruct.Closure [Instruct.Grab; Instruct.Grab; Instruct.Access 1; Instruct.Return]]
+  compile (Lambda.Fun (2, [Lambda.Var 1])) [] = [Instruct.Closure [Instruct.Pop; Instruct.Grab; Instruct.Grab; Instruct.Access 1; Instruct.Return]]
 
 (* order of push stack *)
 let test_order () =
@@ -17,7 +17,7 @@ let test_order () =
 
 let test_bind () =
   compile (Lambda.Fun (0, [Lambda.Bind (Lambda.Int 3); Lambda.Var 0])) [] =
-  [Instruct.Closure [Instruct.Const 3; Instruct.Bind; Instruct.Access 0; Instruct.Return]]
+  [Instruct.Closure [Instruct.Pop; Instruct.Const 3; Instruct.Bind; Instruct.Access 0; Instruct.Return]]
 
 let tests = [
   ("compile_identity", test_identity);
