@@ -15,7 +15,7 @@ let test_variable_bind () =
 
 let test_factorial () =
   (eval "(fn fact n =>
-          if x=0 then 1
+          if n=0 then 1
           else n * fact (n-1)) 5") = (Value 120)
 
 let test_plus () =
@@ -42,7 +42,7 @@ let tests = [
   ("test_mul", test_mul);
   ("test_plus1", test_plus1);
   ("test_if_then_else", test_if_then_else);
-  (* ("factorial", test_factorial); *)
+  ("factorial", test_factorial);
 ]
 
 

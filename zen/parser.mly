@@ -8,6 +8,7 @@
 %token <int> INT
 %token PLUS
 %token MUL
+%token SUB
 %token <string> IDENT
 %token FN
 %token LPAREN
@@ -18,7 +19,6 @@
 %token THEN
 %token ELSE
 %token EQUAL
-%token EOL
 %token EOF
 %token SEMICOLON
 
@@ -49,10 +49,14 @@ exp:
     { $1 }
 | FN formal_args ARROW fn_body
     { Fun($2, $4) }
+| FN formal_args ARROW2 fn_body
+    { Fun1($2, $4) }
 | exp actual_args
     { App($1, $2) }
 | exp PLUS exp
     { Plus($1, $3) }
+| exp SUB exp
+    { Sub($1, $3) }
 | exp MUL exp
     { Mul($1, $3) }
 | exp EQUAL exp

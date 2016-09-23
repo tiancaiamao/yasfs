@@ -1,15 +1,12 @@
 {
         open Parser
 }
-let space = [' ' '\t' '\r']
-let newline = ['\n']
+let space = [' ' '\t' '\r' '\n']
 let digit = ['0'-'9']
 let lower = ['a'-'z']
 let upper = ['A'-'Z']
 
 rule token = parse
-| newline
-    { EOL }
 | space+
     { token lexbuf }
 | '('
@@ -26,6 +23,8 @@ rule token = parse
     { INT(int_of_string (Lexing.lexeme lexbuf)) }
 | '+'
     { PLUS }
+| '-'
+    { SUB }
 | '*'
     { MUL }
 | '='

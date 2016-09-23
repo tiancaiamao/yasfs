@@ -16,10 +16,16 @@ let rec ast2lambda env ast = match ast with
     Lambda.Fun (List.length ts,
         let e = extend_env env ts in
           List.map (ast2lambda e) t)
+  | Ast.Fun1 (ts, t) ->
+    Lambda.Fun1 (List.length ts,
+        let e = extend_env env ts in
+          List.map (ast2lambda e) t)
   | Ast.Var s -> (match find_env env s with
     | Some i -> Lambda.Var i
     | None -> failwith "cannot handle free variable")
   | Ast.Plus (t1, t2) -> Lambda.Plus (
+    (ast2lambda env t1), (ast2lambda env t2))
+  | Ast.Sub (t1, t2) -> Lambda.Sub (
     (ast2lambda env t1), (ast2lambda env t2))
   | Ast.Mul (t1, t2) -> Lambda.Mul (
     (ast2lambda env t1), (ast2lambda env t2))

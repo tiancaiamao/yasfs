@@ -20,6 +20,8 @@ let rec compile exp code = match exp with
     compile t [Instruct.Branch ((compile succ code), (compile fail code))]
   | Lambda.Plus (a, b) ->
     compile a (compile b (Instruct.Plus::code))
+  | Lambda.Sub (a, b) ->
+    compile a (compile b (Instruct.Sub::code))
   | Lambda.Mul (a, b) ->
     compile a (compile b (Instruct.Mul::code))
   | Lambda.Equal (a, b) ->
@@ -29,6 +31,7 @@ and compile_tail exp = match exp with
   | Lambda.Var n -> [Instruct.Access n; Instruct.Return]
   | Lambda.Bind t -> [Instruct.Bind]
   | Lambda.Plus _ -> compile exp [Instruct.Return]
+  | Lambda.Sub _ -> compile exp [Instruct.Return]
   | Lambda.Mul _ -> compile exp [Instruct.Return]
   | Lambda.Equal _ -> compile exp [Instruct.Return]
   | Lambda.If _ -> compile exp [Instruct.Return]
@@ -69,6 +72,12 @@ let step (c, e, s, r) op =
   | Instruct.Plus -> (match Stack.pop s with
     | Value x -> (match Stack.pop s with
         | Value y -> Stack.push (Value (x+y)) s;
+          (c, e, s, r)
+        | _ -> failwith "can add non int")
+    | _ -> failwith "can add non int")
+  | Instruct.Sub -> (match Stack.pop s with
+    | Value x -> (match Stack.pop s with
+        | Value y -> Stack.push (Value (x-y)) s;
           (c, e, s, r)
         | _ -> failwith "can add non int")
     | _ -> failwith "can add non int")

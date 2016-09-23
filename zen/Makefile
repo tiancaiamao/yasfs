@@ -33,7 +33,7 @@ driver_test: zen.cma
 bruijn_test: zen.cma
 	ocaml zen.cma bruijn_test.ml
 
-bruijn.cmo: bruijn.ml lambda.cmo
+bruijn.cmo: bruijn.ml lambda.cmo ast.cmo
 
 parser.cmo:parser.ml parser.cmi ast.cmo
 

@@ -13,4 +13,5 @@ type t =
   | Bind
   | Plus
   | Mul
+  | Sub
   | Equal
