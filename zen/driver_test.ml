@@ -24,6 +24,9 @@ let test_plus () =
 let test_plus1 () =
   (eval "(fn x y -> x + y) 3 5") = (Value 8)
 
+let test_mul () =
+  (eval "3*7") = (Value 21)
+
 let test_bool () =
   ((eval "1=1") = (Bool true)) && ((eval "1=2") = (Bool false))
 
@@ -36,6 +39,7 @@ let tests = [
   ("partial_apply", test_partial_apply);
   ("variable_bind", test_variable_bind);
   ("test_plus", test_plus);
+  ("test_mul", test_mul);
   ("test_plus1", test_plus1);
   ("test_if_then_else", test_if_then_else);
   (* ("factorial", test_factorial); *)

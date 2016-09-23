@@ -12,4 +12,5 @@ type t =
   | Branch of t list * t list
   | Bind
   | Plus
+  | Mul
   | Equal

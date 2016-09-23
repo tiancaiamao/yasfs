@@ -7,4 +7,5 @@ type t =
   | Bind of t
   | If of t * t * t
   | Plus of t * t
+  | Mul of t * t
   | Equal of t * t

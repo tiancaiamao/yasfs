@@ -7,6 +7,7 @@
 %token BIND
 %token <int> INT
 %token PLUS
+%token MUL
 %token <string> IDENT
 %token FN
 %token LPAREN
@@ -52,6 +53,8 @@ exp:
     { App($1, $2) }
 | exp PLUS exp
     { Plus($1, $3) }
+| exp MUL exp
+    { Mul($1, $3) }
 | exp EQUAL exp
     { Equal($1, $3) }
 | IF exp THEN exp ELSE exp

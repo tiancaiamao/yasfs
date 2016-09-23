@@ -26,6 +26,8 @@ rule token = parse
     { INT(int_of_string (Lexing.lexeme lexbuf)) }
 | '+'
     { PLUS }
+| '*'
+    { MUL }
 | '='
     { EQUAL }
 | "->"
