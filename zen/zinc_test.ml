@@ -19,12 +19,16 @@ let test_bind () =
   compile (Lambda.Fun (0, [Lambda.Bind (Lambda.Int 3); Lambda.Var 0])) [] =
   [Instruct.Closure [Instruct.Pop; Instruct.Const 3; Instruct.Bind; Instruct.Access 0; Instruct.Return]]
 
+let test_recur_fn () =
+  compile (Lambda.Fun1 (0, [Lambda.Var 0])) [] = [Instruct.Closure [Instruct.Access 0; Instruct.Return]]
+
 let tests = [
   ("compile_identity", test_identity);
   ("compile_basic_apply", test_basic_apply);
   ("compile_multi_argument", test_multi_argument);
   ("compile_order", test_order);
   ("compile_bind", test_bind);
+  ("compile_recur_fn", test_recur_fn);
 ]
 
 let testfn = function (a, b) -> Printf.printf "%s ... %s\n" a (if b () then "ok" else "fail");;

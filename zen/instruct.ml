@@ -10,3 +10,4 @@ type t =
   | Return
   | Stop
   | Bind
+  | Plus

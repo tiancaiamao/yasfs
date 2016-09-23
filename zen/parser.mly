@@ -46,6 +46,8 @@ exp:
     { Fun($2, $4) }
 | exp actual_args
     { App($1, $2) }
+| exp PLUS exp
+    { Plus($1, $3) }
 | IDENT BIND exp
     { Bind($1, $3) }
 | error
