@@ -25,6 +25,8 @@ a := 3
 a, b, c := 1, 2, 3
 计算右值时，左边变量在环境中不可见
 
+## => 与 ->
+
 函数的写法，其实是语法糖
 fn f x => x + x
 等价于在全局环境中 匿名函数 + 变量绑定
@@ -58,3 +60,52 @@ fn x ->
 之后加条件 循环 分支
 然后是简单类型推导
 patten match是需要的，但是第一期暂时不做，至少要做完type infer
+
+fn f x y => 
+   x := f x a;
+   f x+1 y-1;
+
+没有let in的概念
+
+## ;; 与 ;
+
+如果不做分隔会出问题
+
+  fn f n =>
+     fn loop i n =>
+        if i=n then loop xxx
+        else
+          yyy // 这个yyy到底是属于loop这一层呢，还是上一层f？
+
+lua用function ... end do ... end这种显示的标记
+c Go java 典型的 { }
+lisp是()
+ML必须有let xxx in 的in来做区分
+F#或者python那种用tab缩进来控制是个很坑的事情
+
+缩进的方式可读性好
+
+引入{}
+
+fn x y ->
+   fn f1 x y =>
+      c := c y;
+      f1 (x+1) (y-1);;
+
+fn fact n => if x then
+   fn dead => sdf;
+   x := fn a b -> b + a;
+   dead x;;
+
+
+fn x -> x + y;
+
+引入;作为end，这很重要
+
+x := (if a
+  b
+  c)
+  5
+
+let loop x =
+    loop x+1

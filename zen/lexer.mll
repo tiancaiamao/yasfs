@@ -16,6 +16,12 @@ rule token = parse
     { LPAREN }
 | ')'
     { RPAREN }
+| '{'
+    { LBRACE }
+| '}'
+    { RBRACE }
+| ';'
+    { SEMICOLON }
 | digit+
     { INT(int_of_string (Lexing.lexeme lexbuf)) }
 | '+'

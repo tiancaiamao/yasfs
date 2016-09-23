@@ -20,6 +20,8 @@ lib:zen.cma
 zen.cma : ast.cmo lambda.cmo instruct.cmo lexer.cmo parser.cmo bruijn.cmo zinc.cmo driver.cmo
 	ocamlc -o zen.cma -a $^
 
+zinc.cmo : lambda.cmo ast.cmo instruct.cmo
+
 test : zinc_test driver_test bruijn_test
 
 zinc_test: zen.cma

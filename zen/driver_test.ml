@@ -10,10 +10,19 @@ let test_multi_argument () =
 let test_partial_apply () =
   (eval "((fn x y -> y) 1) 42") = (Value 42)
 
+let test_variable_bind () =
+  (eval "a := 3; a") = (Value 3)
+
+let test_factorial () =
+(eval "(fn fact n =>
+          if x=0 then 1
+          else n * fact (n-1)) 5") = (Value 120)
+
 let tests = [
   ("identity", test_identity);
   ("multi_argument", test_multi_argument);
   ("partial_apply", test_partial_apply);
+  ("variable_bind", test_variable_bind);
 ]
 
 

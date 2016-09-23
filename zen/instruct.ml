@@ -8,3 +8,4 @@ type t =
   | Grab
   | Return
   | Stop
+  | Bind

@@ -1,16 +1,18 @@
 let rec compile exp code = match exp with
     Lambda.Int v -> (Instruct.Const v)::code
   | Lambda.Var n -> (Instruct.Access n)::code
-  | Lambda.Fun (n,t) -> (Instruct.Closure (compile_tail exp))::code
+  | Lambda.Bind t -> compile t (Instruct.Bind::code)
+  | Lambda.Fun (n,ts) -> (Instruct.Closure (List.flatten (List.map compile_tail ts)))::code
   | Lambda.App (t,ts) ->
     let init = compile t (Instruct.Apply::code) in
     Instruct.Pushmark::(List.fold_left (fun a b -> compile b a) init ts)
 and compile_tail exp = match exp with
     Lambda.Int v -> [Instruct.Const v]
   | Lambda.Var n -> [Instruct.Access n; Instruct.Return]
-  | Lambda.Fun (n,t) -> (match n with
-      0 -> (compile_tail t)
-    | _ -> Instruct.Grab::(compile_tail (Lambda.Fun (n-1,t))))
+  | Lambda.Bind t -> [Instruct.Bind]
+  | Lambda.Fun (n,ts) -> (match n with
+      0 -> List.flatten (List.map compile_tail ts)
+    | _ -> Instruct.Grab::(compile_tail (Lambda.Fun (n-1,ts))))
   | Lambda.App (t,ts) ->
     (t::ts
      |> List.rev
