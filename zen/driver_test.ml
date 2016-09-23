@@ -23,6 +23,7 @@ let tests = [
   ("multi_argument", test_multi_argument);
   ("partial_apply", test_partial_apply);
   ("variable_bind", test_variable_bind);
+  (* ("factorial", test_factorial); *)
 ]
 
 

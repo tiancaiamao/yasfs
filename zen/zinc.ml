@@ -1,8 +1,15 @@
+let repeat n v =
+  let rec repeat n v r =
+    if n=0 then r else repeat (n-1) v (v::r) in
+  repeat n v []
+
 let rec compile exp code = match exp with
     Lambda.Int v -> (Instruct.Const v)::code
   | Lambda.Var n -> (Instruct.Access n)::code
   | Lambda.Bind t -> compile t (Instruct.Bind::code)
-  | Lambda.Fun (n,ts) -> (Instruct.Closure (List.flatten (List.map compile_tail ts)))::code
+  | Lambda.Fun (n,ts) ->
+    let body = (repeat n Instruct.Grab) @ (compile_body ts) in
+        (Instruct.Closure body)::code
   | Lambda.App (t,ts) ->
     let init = compile t (Instruct.Apply::code) in
     Instruct.Pushmark::(List.fold_left (fun a b -> compile b a) init ts)
@@ -10,14 +17,20 @@ and compile_tail exp = match exp with
     Lambda.Int v -> [Instruct.Const v]
   | Lambda.Var n -> [Instruct.Access n; Instruct.Return]
   | Lambda.Bind t -> [Instruct.Bind]
-  | Lambda.Fun (n,ts) -> (match n with
-      0 -> List.flatten (List.map compile_tail ts)
-    | _ -> Instruct.Grab::(compile_tail (Lambda.Fun (n-1,ts))))
+  | Lambda.Fun (n,ts) -> (match ts with
+    | [t] -> (match n with
+        | 0 -> compile_tail t
+        | _ -> Instruct.Grab::(compile_tail (Lambda.Fun (n-1,[t]))))
+    | _ -> failwith "must be one")
   | Lambda.App (t,ts) ->
     (t::ts
      |> List.rev
      |> List.map (fun x -> compile x [])
      |> List.flatten) @ [Instruct.Tailapply]
+and compile_body ts = match ts with
+  | [x] -> compile_tail x
+  | x::xs -> compile x (compile_body xs)
+  | [] -> []
 
 type result =
     Value of int

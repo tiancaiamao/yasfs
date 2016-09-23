@@ -1,7 +1,5 @@
 open Zinc
 
-let step1 ((op::c), e, s, r) = step (c, e, s, r) op
-
 let state c = (c, [], (Stack.create ()), (Stack.create ()))
 
 let easy_run code = run code [] (Stack.create ()) (Stack.create ())
