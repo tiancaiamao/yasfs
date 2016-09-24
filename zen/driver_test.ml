@@ -13,6 +13,12 @@ let test_partial_apply () =
 let test_variable_bind () =
   (eval "a := 3; a") = (Value 3)
 
+let test_sum100 () =
+  (eval "(fn loop i sum =>
+            if i=101 then sum
+            else (loop (i+1) (sum+i)))
+          1 0") = (Value 5050)
+
 let test_factorial () =
   (eval "(fn fact n =>
           if n=0 then 1
@@ -42,6 +48,7 @@ let tests = [
   ("test_mul", test_mul);
   ("test_plus1", test_plus1);
   ("test_if_then_else", test_if_then_else);
+  ("test_sum100", test_sum100);
   ("factorial", test_factorial);
 ]
 

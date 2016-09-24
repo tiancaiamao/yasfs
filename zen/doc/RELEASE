@@ -7,3 +7,12 @@
 语法支持int常量，变量，匿名函数，调用函数
 
 基础的ZINC虚拟机，支持Access Grab Pushmark Closure Return Tailapply Apply几条指令
+
+## v0.0.2
+
+一句话描述：可以跑过阶乘函数和1-100求和了
+
+添加了递归函数支持，fn => 语法
+添加了+ - * 几个基本运算
+添加了if then else语句
+添加了BOOL类型

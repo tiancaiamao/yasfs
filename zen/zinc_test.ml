@@ -22,11 +22,15 @@ let test_bind () =
 let test_recur_fn () =
   compile (Lambda.Fun1 (0, [Lambda.Var 0])) [] = [Instruct.Closure [Instruct.Access 0; Instruct.Return]]
 
+let test_sub () =
+  compile (Lambda.Sub (Lambda.Int 2, Lambda.Int 1)) [] = [Instruct.Const 2; Instruct.Const 1; Instruct.Sub]
+
 let tests = [
   ("compile_identity", test_identity);
   ("compile_basic_apply", test_basic_apply);
   ("compile_multi_argument", test_multi_argument);
   ("compile_order", test_order);
+  ("compile_sub", test_sub);
   ("compile_bind", test_bind);
   ("compile_recur_fn", test_recur_fn);
 ]

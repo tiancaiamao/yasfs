@@ -77,7 +77,7 @@ let step (c, e, s, r) op =
     | _ -> failwith "can add non int")
   | Instruct.Sub -> (match Stack.pop s with
     | Value x -> (match Stack.pop s with
-        | Value y -> Stack.push (Value (x-y)) s;
+        | Value y -> Stack.push (Value (y-x)) s;
           (c, e, s, r)
         | _ -> failwith "can add non int")
     | _ -> failwith "can add non int")
