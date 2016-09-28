@@ -1,5 +1,6 @@
 type t =
     Const of int
+  | Bool of bool
   | Access of int
   | Closure of t list
   | Tailapply

@@ -17,7 +17,7 @@ all: lib
 
 lib:zen.cma
 
-zen.cma : ast.cmo lambda.cmo instruct.cmo lexer.cmo parser.cmo bruijn.cmo zinc.cmo driver.cmo
+zen.cma : ast.cmo lambda.cmo type.cmo instruct.cmo lexer.cmo parser.cmo bruijn.cmo zinc.cmo driver.cmo infer.cmo
 	ocamlc -o zen.cma -a $^
 
 zinc.cmo : lambda.cmo ast.cmo instruct.cmo
@@ -40,6 +40,8 @@ parser.cmo:parser.ml parser.cmi ast.cmo
 lexer.cmo: parser.cmo
 
 parser.cmi: parser.mli ast.cmo
+
+infer.cmo: type.cmo ast.cmo
 
 clean:
 	rm -rf parser.ml parser.mli lexer.ml *.cmo *.cmi *.cma

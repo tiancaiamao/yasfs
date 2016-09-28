@@ -5,6 +5,7 @@ let repeat n v =
 
 let rec compile exp code = match exp with
     Lambda.Int v -> (Instruct.Const v)::code
+  | Lambda.Bool v -> (Instruct.Bool v)::code
   | Lambda.Var n -> (Instruct.Access n)::code
   | Lambda.Bind t -> compile t (Instruct.Bind::code)
   | Lambda.Fun (n,ts) ->
@@ -28,6 +29,7 @@ let rec compile exp code = match exp with
     compile a (compile b (Instruct.Equal::code))
 and compile_tail exp = match exp with
     Lambda.Int v -> [Instruct.Const v]
+  | Lambda.Bool v -> [Instruct.Bool v]
   | Lambda.Var n -> [Instruct.Access n; Instruct.Return]
   | Lambda.Bind t -> [Instruct.Bind]
   | Lambda.Plus _ -> compile exp [Instruct.Return]
@@ -67,7 +69,8 @@ let env_put (e : result list) v = v :: e
 
 let step (c, e, s, r) op =
   match op with
-    Instruct.Const v -> Stack.push (Value v) s; (c, e, s, r)
+  Instruct.Bool v -> Stack.push (Bool v) s; (c, e, s, r)
+  | Instruct.Const v -> Stack.push (Value v) s; (c, e, s, r)
   | Instruct.Pop -> Stack.pop s |> ignore; (c, e, s, r)
   | Instruct.Plus -> (match Stack.pop s with
     | Value x -> (match Stack.pop s with
