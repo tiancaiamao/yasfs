@@ -71,40 +71,43 @@ let env_lookup env n = List.assoc n env
 
 let env_extend env n v = (n,v)::env
 
-(* let rec type_of exp env subst = *)
-(*   match exp with *)
-(*   | Ast.Bool _ -> (Type.Bool, subst) *)
-(*   | Ast.Int n -> (Type.Int, subst) *)
-(*   | Ast.Equal (a,b) -> *)
-(*     let (ta, subst1) = (type_of a env subst) in *)
-(*     let subst2 = (unifier ta Type.Int subst1 a) in *)
-(*     let (tb, subst3) = (type_of a env subst2) in *)
-(*     let subst4 = (unifier tb Type.Int subst3 b) in *)
-(*     (Type.Bool, subst4) *)
-(*   | Ast.Plus (a,b) -> *)
-(*     let (ta, subst1) = (type_of a env subst) in *)
-(*     let subst2 = (unifier ta Type.Int subst1 a) in *)
-(*     let (tb, subst3) = (type_of b env subst2) in *)
-(*     let subst4 = (unifier tb Type.Int subst3 b) in *)
-(*     (Type.Int, subst4) *)
-(*   | Ast.If (a,b,c) -> *)
-(*     let (ta, subst1) = (type_of a env subst) in *)
-(*     let subst2 = unifier ta Type.Bool subst1 a in *)
-(*     let (tb, subst3) = (type_of b env subst2) in *)
-(*     let (tc, subst4) = (type_of c env subst3) in *)
-(*     let subst5 = unifier tb tc subst4 exp in *)
-(*     (tb, subst5) *)
-(*   | Ast.Var n -> ((env_lookup env n), subst) *)
-(*   | Ast.Fun (var,body) -> *)
-(*     let tv = Type.Var var in *)
-(*     let (ty, subst1) = type_of body (env_extend env var tv) subst in *)
-(*     (Type.Fun (tv,ty), subst1) *)
-(*   | Ast.App (rator,rand) -> *)
-(*     let result_type = Type.Var "ret" in *)
-(*     let (rator_type, subst1) = type_of rator env subst in *)
-(*     let (rand_type, subst2) = type_of rand env subst1 in *)
-(*     let subst3 = unifier rator_type (Type.Fun (rand_type, result_type)) subst2 exp in *)
-(*     (result_type, subst3) *)
+let gen_var = let id = ref 0 in
+  fun () -> id := !id + 1; Type.Var !id
+
+let rec type_of exp env subst =
+  match exp with
+  | Ast.Bool _ -> (Type.Bool, subst)
+  | Ast.Int n -> (Type.Int, subst)
+  | Ast.Equal (a,b) ->
+    let (ta, subst1) = (type_of a env subst) in
+    let subst2 = (subst1 >>= (unifier ta Type.Int)) in
+    let (tb, subst3) = (type_of b env subst2) in
+    let subst4 = (subst3 >>= (unifier tb Type.Int)) in
+    (Type.Bool, subst4)
+  | Ast.Plus (a,b) ->
+    let (ta, subst1) = (type_of a env subst) in
+    let subst2 = subst1 >>= (unifier ta Type.Int) in
+    let (tb, subst3) = (type_of b env subst2) in
+    let subst4 = subst3 >>= (unifier tb Type.Int) in
+    (Type.Int, subst4)
+  | Ast.If (a,b,c) ->
+    let (ta, subst1) = type_of a env subst in
+    let subst2 = subst1 >>= (unifier ta Type.Bool) in
+    let (tb, subst3) = type_of b env subst2 in
+    let (tc, subst4) = type_of c env subst3 in
+    let subst5 = subst4 >>= (unifier tb tc) in
+    (tb, subst5)
+  | Ast.Var n -> ((env_lookup env n), subst)
+  | Ast.Fun (var,body) ->
+    let tv = gen_var () in
+    let (ty, subst1) = type_of body (env_extend env var tv) subst in
+    (Type.Fun (tv,ty), subst1)
+  | Ast.App (rator,rand) ->
+    let result_type = gen_var () in
+    let (rator_type, subst1) = type_of rator env subst in
+    let (rand_type, subst2) = type_of rand env subst1 in
+    let subst3 = subst2 >>= (unifier rator_type (Type.Fun (rand_type, result_type))) in
+    (result_type, subst3)
 
 (* let infer exp = let (ty, subst) = type_of exp [] [] in *)
 (*   apply_subst_to_type ty subst *)

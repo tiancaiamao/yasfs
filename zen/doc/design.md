@@ -125,3 +125,9 @@ HM系统的问题：
 
 fn id x => x
 (fn f -> (f 3), (f true)) id
+
+## 声明
+
+用::符号声明函数
+
+    (>>=)  :: Maybe a -> (a -> Maybe b) -> Maybe b
