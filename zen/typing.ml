@@ -13,16 +13,16 @@ end
 module Type = struct
   type t = Int | Bool
          | Fun of t * t
-         | Var of int
+         | Var of char
 end
 
 let rec subst t0 v t =
   match t0 with
   | Type.Int -> Type.Int
   | Type.Bool -> Type.Bool
+  | Type.Var s -> if s = v then t else t0
   | Type.Fun (arg,ret) ->
     Type.Fun (subst arg v t, subst ret v t)
-  | Type.Var s -> if t0 = v then t else t0
 
 let rec update_type t subst =
   match t with
@@ -30,19 +30,17 @@ let rec update_type t subst =
   | Type.Bool -> Type.Bool
   | Type.Fun (arg,ret) ->
     Type.Fun (update_type arg subst, update_type ret subst)
-  | Type.Var s -> try List.assoc t subst with _ -> t
+  | Type.Var v -> try List.assoc v subst with _ -> t
 
 let extend_subst s v t =
-  let update (lhs,rhs) = lhs, (subst rhs v t) in
-  (v,t)::(List.map update s)
+  (v,t)::(List.map (fun (v1,rhs) -> (v1, (subst rhs v t))) s)
 
 let rec occur v t =
-  match v with
-  | Type.Int -> false
-  | Type.Bool -> false
+  match t with
+  | Type.Var v1 -> v = v1
   | Type.Fun (arg,ret) ->
     (occur v arg) || (occur v ret)
-  | Type.Var s -> v = t
+  | _ -> false
 
 (* 'a M -> ('a -> 'b M) -> 'b M *)
 let (>>=) aM a2bM = match aM with
@@ -57,10 +55,10 @@ let rec unifier t1 t2 s =
   | (Type.Int,Type.Int) -> Some s
   | (Type.Bool,Type.Bool) -> Some s
   | (Type.Var a, Type.Var b) when a=b -> Some s
-  | (Type.Var _, _) -> if (occur ty1 ty2) then None
-    else Some (extend_subst s ty1 ty2)
-  | (_, Type.Var _) -> if (occur ty2 ty1) then None
-    else Some (extend_subst s ty2 ty1)
+  | (Type.Var a, _) -> if (occur a ty2) then None
+    else Some (extend_subst s a ty2)
+  | (_, Type.Var b) -> if (occur b ty1) then None
+    else Some (extend_subst s b ty1)
   | (Type.Fun(a1,e1), Type.Fun(a2,e2)) ->
     (Some s)
     >>= (unifier a1 a2)
@@ -71,8 +69,8 @@ let env_lookup env n = List.assoc n env
 
 let env_extend env n v = (n,v)::env
 
-let gen_var = let id = ref 0 in
-  fun () -> id := !id + 1; Type.Var !id
+let gen_var = let id = ref 96 in
+  fun () -> id := !id + 1; Type.Var (Char.chr !id)
 
 let rec type_of exp env subst =
   match exp with
@@ -109,20 +107,24 @@ let rec type_of exp env subst =
     let subst3 = subst2 >>= (unifier rator_type (Type.Fun (rand_type, result_type))) in
     (result_type, subst3)
 
-(* let infer exp = let (ty, subst) = type_of exp [] [] in *)
-(*   apply_subst_to_type ty subst *)
+let infer exp =
+  let (ty, subst) = type_of exp [] (Some []) in
+  match subst with
+  | Some s -> update_type ty s
+  | None -> failwith "false"
 
-(* let output4 = type_of (Ast.Plus ((Ast.Var "x"), (Ast.Var "y"))) [("x",Type.Var "x"); ("y",Type.Var "y")] [];; *)
+
+let input1 = Ast.Fun ("f", Ast.Fun ("x",
+                             Ast.Plus(Ast.App (Ast.Var "f", Ast.Int 3),
+                                      Ast.App (Ast.Var "f", Ast.Var "x"))))
+let output1 = infer input1
 
 
-(* let input2 = Ast.Fun ("f", Ast.App (Ast.Var "f", Ast.Int 11)) *)
-(* let output2 = infer input2 *)
-
-(* let input1 = Ast.Fun ("f", Ast.Fun ("x", *)
-(*                              Ast.Plus(Ast.App (Ast.Var "f", Ast.Int 3), *)
-(*                                       Ast.App (Ast.Var "f", Ast.Var "x")))) *)
-(* let output1 = infer input1 *)
-
+let input2 = Ast.Fun ("f", Ast.App (Ast.Var "f", Ast.Int 11))
+let output2 = infer input2
 
 (* let input3 = Ast.Fun ("x", Ast.If ((Ast.Var "x"), (Ast.Plus ((Ast.Var "x"), (Ast.Int 1))), Ast.Int 0)) *)
+
+let output4 = type_of (Ast.Plus ((Ast.Var "x"), (Ast.Var "y"))) [("x",Type.Var 'x'); ("y",Type.Var 'y')] (Some []);;
+
 
