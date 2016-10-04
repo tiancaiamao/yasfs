@@ -41,6 +41,10 @@ rule token = parse
     { THEN }
 | "else"
     { ELSE }
+| "true"
+    { TRUE }
+| "false"
+    { FALSE }
 | ":="
     { BIND }
 | eof

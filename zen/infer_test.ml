@@ -9,12 +9,12 @@ let tests = [
   (* ("x := true; x 3", false); *)
   (* ("f := 3; fn x -> f x", false); *)
   ("(fn x -> x 3) 4", false);
-  (* ("(fn x -> x-3) true", false); *)
+  ("(fn x -> x-3) true", false);
   ("(fn f -> fn x -> f x) 3", false);
   (* ("fn f x => f (x-1)", true); (\* dead loop but type safe *\) *)
   (* ("fn f -> fn x -> (f 3) - (f x)", true); *)
   ("fn f -> f 11", true);
-  (* ("if x then x-1 else 0", false); *)
+  ("fn x -> if x then x-1 else 0", false);
   ("fn f -> (f f) = 0", false);
 ];;
 
@@ -27,6 +27,6 @@ let infer_of str =
   | Some s -> true
   | None -> false
 
-let test_one (s, r) = Printf.printf "%s ... %s\n" s (if r = infer_of s then "true" else "false");;
+let test_one (s, r) = Printf.printf "%s ... %s\n" s (if r = infer_of s then "succ" else "fail");;
 
 List.iter test_one tests

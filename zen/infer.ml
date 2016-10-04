@@ -51,8 +51,9 @@ let env_lookup env n = List.assoc n env
 
 let env_extend env n v = (n,v)::env
 
-let gen_var = let id = ref 96 in
-  fun () -> id := !id + 1; Type.Var (Char.chr !id)
+let (gen_var, reset_var) = let id = ref 96 in
+  (fun () -> id := !id + 1; Type.Var (Char.chr !id)),
+  (fun () -> id := 96)
 
 let rec type_of exp env subst =
   match exp with
@@ -70,6 +71,12 @@ let rec type_of exp env subst =
     let (tb, subst3) = (type_of b env subst2) in
     let subst4 = subst3 >>= (unifier tb Type.Int) in
     (Type.Int, subst4)
+  | Ast.Sub (a,b) ->
+    let (ta, subst1) = (type_of a env subst) in
+    let subst2 = subst1 >>= (unifier ta Type.Int) in
+    let (tb, subst3) = (type_of b env subst2) in
+    let subst4 = subst3 >>= (unifier tb Type.Int) in
+    (Type.Int, subst4)
   | Ast.If (a,b,c) ->
     let (ta, subst1) = type_of a env subst in
     let subst2 = subst1 >>= (unifier ta Type.Bool) in
@@ -79,7 +86,7 @@ let rec type_of exp env subst =
     (tb, subst5)
   | Ast.Var n -> ((env_lookup env n), subst)
   | Ast.Fun (vars,body) -> (match vars with
-    | [] -> assert false
+    | [] -> failwith "fuck..1"
     | x::[] -> let tv = gen_var () in
       let (ty, subst1) = type_of_body body (env_extend env x tv) subst in
       (Type.Fun (tv, ty), subst1)
@@ -88,7 +95,7 @@ let rec type_of exp env subst =
       (Type.Fun (tv, ty), subst1))
   | Ast.App (rator,rands) ->
     (match rands with
-    | [] -> assert false
+    | [] -> failwith "should never run here"
     | x::[] ->
       let result_type = gen_var () in
       let (rator_type, subst1) = type_of rator env subst in
@@ -99,11 +106,12 @@ let rec type_of exp env subst =
   | _ -> failwith "not support yet"
 and type_of_body ls env subst =
   match ls with
-  | [] -> assert false
+  | [] -> failwith "fuck you"
   | x::[] -> type_of x env subst
   | x::xs -> failwith "not implement yet"
 
 let infer exp =
+  let () = reset_var () in
   let (ty, subst) = type_of exp [] (Some []) in
   match subst with
   | Some s -> update_type ty s

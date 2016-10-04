@@ -6,10 +6,12 @@
 %token ARROW2
 %token BIND
 %token <int> INT
+%token <string> IDENT
 %token PLUS
 %token MUL
 %token SUB
-%token <string> IDENT
+%token TRUE
+%token FALSE
 %token FN
 %token LPAREN
 %token RPAREN
@@ -43,6 +45,10 @@ simple_exp:
     { Int($1) }
 | IDENT
     { Var($1) }
+| TRUE
+    { Bool(true) }
+| FALSE
+    { Bool(false) }
 
 exp:
 | simple_exp
