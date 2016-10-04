@@ -17,12 +17,15 @@ all: lib
 
 lib:zen.cma
 
-zen.cma : ast.cmo lambda.cmo type.cmo instruct.cmo lexer.cmo parser.cmo bruijn.cmo zinc.cmo driver.cmo infer.cmo
+zen.cma : ast.cmo lambda.cmo type.cmo instruct.cmo lexer.cmo parser.cmo bruijn.cmo zinc.cmo infer.cmo driver.cmo
 	ocamlc -o zen.cma -a $^
 
 zinc.cmo : lambda.cmo ast.cmo instruct.cmo
 
-test : zinc_test driver_test bruijn_test
+test : zinc_test driver_test bruijn_test infer_test
+
+infer_test: zen.cma
+	ocaml zen.cma infer_test.ml
 
 zinc_test: zen.cma
 	ocaml zen.cma zinc_test.ml
@@ -38,6 +41,8 @@ bruijn.cmo: bruijn.ml lambda.cmo ast.cmo
 parser.cmo:parser.ml parser.cmi ast.cmo
 
 lexer.cmo: parser.cmo
+
+driver.cmo: infer.cmo parser.cmo bruijn.cmo zinc.cmo
 
 parser.cmi: parser.mli ast.cmo
 

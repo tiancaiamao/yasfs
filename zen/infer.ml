@@ -78,17 +78,30 @@ let rec type_of exp env subst =
     let subst5 = subst4 >>= (unifier tb tc) in
     (tb, subst5)
   | Ast.Var n -> ((env_lookup env n), subst)
-  (* | Ast.Fun (var,body) -> *)
-  (*   let tv = gen_var () in *)
-  (*   let (ty, subst1) = type_of body (env_extend env var tv) subst in *)
-  (*   (Type.Fun (tv,ty), subst1) *)
-  (* | Ast.App (rator,rand) -> *)
-  (*   let result_type = gen_var () in *)
-  (*   let (rator_type, subst1) = type_of rator env subst in *)
-  (*   let (rand_type, subst2) = type_of rand env subst1 in *)
-  (*   let subst3 = subst2 >>= (unifier rator_type (Type.Fun (rand_type, result_type))) in *)
-  (*   (result_type, subst3) *)
+  | Ast.Fun (vars,body) -> (match vars with
+    | [] -> assert false
+    | x::[] -> let tv = gen_var () in
+      let (ty, subst1) = type_of_body body (env_extend env x tv) subst in
+      (Type.Fun (tv, ty), subst1)
+    | x::xs -> let tv = gen_var () in
+      let (ty, subst1) = type_of (Ast.Fun (xs, body)) (env_extend env x tv) subst in
+      (Type.Fun (tv, ty), subst1))
+  | Ast.App (rator,rands) ->
+    (match rands with
+    | [] -> assert false
+    | x::[] ->
+      let result_type = gen_var () in
+      let (rator_type, subst1) = type_of rator env subst in
+      let (rand_type, subst2) = type_of x env subst1 in
+      let subst3 = subst2 >>= (unifier rator_type (Type.Fun (rand_type, result_type))) in
+      (result_type, subst3)
+    | x::xs -> failwith "not yet")
   | _ -> failwith "not support yet"
+and type_of_body ls env subst =
+  match ls with
+  | [] -> assert false
+  | x::[] -> type_of x env subst
+  | x::xs -> failwith "not implement yet"
 
 let infer exp =
   let (ty, subst) = type_of exp [] (Some []) in

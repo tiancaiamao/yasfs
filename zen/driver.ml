@@ -1,14 +1,18 @@
 open Zinc
 
-let state c = (c, [], (Stack.create ()), (Stack.create ()))
+let step_parse str = Parser.top Lexer.token (Lexing.from_string str)
 
-let easy_run code = run code [] (Stack.create ()) (Stack.create ())
+let step_infer ast = List.iter (fun x -> (Infer.infer x) |> ignore) ast
 
-let input0 = Lambda.App ((Lambda.Fun (2,[Lambda.Var 1])), [Lambda.Int 3; Lambda.Int 5])
+let step_bruijn ast = Bruijn.ast2lambda [] (List.hd ast)
 
-let s0 = compile input0 [Instruct.Stop]
+let step_compile ir = Zinc.compile ir [Instruct.Stop]
 
-let eval s = let ast = Parser.top Lexer.token (Lexing.from_string s) in
-  let ir = Bruijn.ast2lambda [] (List.hd ast) in
-  let bc = Zinc.compile ir [Instruct.Stop] in
-  easy_run bc;;
+let step_run code = run code [] (Stack.create ()) (Stack.create ())
+
+let eval s =
+  let ast = step_parse s in
+  let _ = step_infer ast in
+  let ir = step_bruijn ast in
+  let bc = step_compile ir in
+  step_run bc
