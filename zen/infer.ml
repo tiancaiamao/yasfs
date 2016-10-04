@@ -93,8 +93,15 @@ let rec type_of exp env subst =
     | x::xs -> let tv = gen_var () in
       let (ty, subst1) = type_of (Ast.Fun (xs, body)) (env_extend env x tv) subst in
       (Type.Fun (tv, ty), subst1))
-  | Ast.App (rator,rands) ->
-    (match rands with
+  | Ast.App (rator,rands) -> type_of_app rator (List.rev rands) env subst
+  | _ -> failwith "not support yet"
+and type_of_body ls env subst =
+  match ls with
+  | [] -> failwith "fuck you"
+  | x::[] -> type_of x env subst
+  | x::xs -> failwith "not implement yet"
+and type_of_app rator rev_rands env subst =
+    (match rev_rands with
     | [] -> failwith "should never run here"
     | x::[] ->
       let result_type = gen_var () in
@@ -102,13 +109,12 @@ let rec type_of exp env subst =
       let (rand_type, subst2) = type_of x env subst1 in
       let subst3 = subst2 >>= (unifier rator_type (Type.Fun (rand_type, result_type))) in
       (result_type, subst3)
-    | x::xs -> failwith "not yet")
-  | _ -> failwith "not support yet"
-and type_of_body ls env subst =
-  match ls with
-  | [] -> failwith "fuck you"
-  | x::[] -> type_of x env subst
-  | x::xs -> failwith "not implement yet"
+    | x::xs ->
+      let result_type = gen_var () in
+      let (rator_type, subst1) = type_of_app rator xs env subst in
+      let (rand_type, subst2) = type_of x env subst1 in
+      let subst3 = subst2 >>= (unifier rator_type (Type.Fun (rand_type, result_type))) in
+      (result_type, subst3))
 
 let infer exp =
   let () = reset_var () in

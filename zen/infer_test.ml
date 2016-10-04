@@ -16,6 +16,10 @@ let tests = [
   ("fn f -> f 11", true);
   ("fn x -> if x then x-1 else 0", false);
   ("fn f -> (f f) = 0", false);
+
+  ("fn x y -> x + y", true);
+  ("(fn x y -> x + y) 3 4", true);
+  ("(fn x y -> x + y) true 4", false);
 ];;
 
 let parse str = Parser.top Lexer.token (Lexing.from_string str);;
