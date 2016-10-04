@@ -12,7 +12,7 @@ let tests = [
   ("(fn x -> x-3) true", false);
   ("(fn f -> fn x -> f x) 3", false);
   (* ("fn f x => f (x-1)", true); (\* dead loop but type safe *\) *)
-  (* ("fn f -> fn x -> (f 3) - (f x)", true); *)
+  ("fn f -> fn x -> (f 3) - (f x)", true);
   ("fn f -> f 11", true);
   ("fn x -> if x then x-1 else 0", false);
   ("fn f -> (f f) = 0", false);
