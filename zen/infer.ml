@@ -83,6 +83,12 @@ let rec type_of exp env subst =
     let (tb, subst3, env) = (type_of b env subst2) in
     let subst4 = subst3 >>= (unifier tb Type.Int) in
     (Type.Int, subst4, env)
+  | Ast.Mul (a,b) ->
+    let (ta, subst1, env) = (type_of a env subst) in
+    let subst2 = subst1 >>= (unifier ta Type.Int) in
+    let (tb, subst3, env) = (type_of b env subst2) in
+    let subst4 = subst3 >>= (unifier tb Type.Int) in
+    (Type.Int, subst4, env)
   | Ast.If (a,b,c) ->
     let (ta, subst1, env) = type_of a env subst in
     let subst2 = subst1 >>= (unifier ta Type.Bool) in
@@ -99,9 +105,12 @@ let rec type_of exp env subst =
       | x::xs -> let tv = gen_var () in
         let (ty, subst1, env) = type_of (Ast.Fun (xs, body)) (env_extend env x tv) subst in
         (Type.Fun (tv, ty), subst1, env))
-  | Ast.Fun1 (vars, body) -> type_of (Ast.Fun (vars, body)) env subst
+  | Ast.Fun1 (vars, body) ->
+    let (t, subst1, env) = type_of (Ast.Fun (vars, body)) env subst in
+    (match t with
+    | Type.Fun (self, _) -> (self, subst1, env)
+    | _ -> failwith "Ast.fun1 fail")
   | Ast.App (rator,rands) -> type_of_app rator (List.rev rands) env subst
-  | _ -> failwith "not support yet"
 and type_of_body ls env subst =
   match ls with
   | [] -> failwith "fuck you"
@@ -132,3 +141,18 @@ let infer exp =
   match subst with
   | Some s -> update_type ty s
   | None -> failwith "false"
+
+let infer_list es =
+  let rec aux_infer es env subst =
+    match es with
+    | [] -> failwith "should not here"
+    | x::[] -> let (ty, subst, env) = type_of x env subst in
+      (match subst with
+       | Some s -> (update_type ty s), env
+       | None -> failwith "false")
+    | x::xs -> let (ty, subst, env) = type_of x env subst in
+      (match subst with
+       | Some s -> aux_infer xs env subst
+       | None -> failwith "false") in
+  let (t, env) = aux_infer es [] (Some []) in
+  t
