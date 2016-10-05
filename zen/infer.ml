@@ -1,5 +1,6 @@
 let rec subst t0 v t =
   match t0 with
+  | Type.Unit -> Type.Unit
   | Type.Int -> Type.Int
   | Type.Bool -> Type.Bool
   | Type.Var s -> if s = v then t else t0
@@ -8,6 +9,7 @@ let rec subst t0 v t =
 
 let rec update_type t subst =
   match t with
+  | Type.Unit -> Type.Unit
   | Type.Int -> Type.Int
   | Type.Bool -> Type.Bool
   | Type.Fun (arg,ret) ->
@@ -36,6 +38,7 @@ let rec unifier t1 t2 s =
   match (ty1,ty2) with
   | (Type.Int,Type.Int) -> Some s
   | (Type.Bool,Type.Bool) -> Some s
+  | (Type.Unit,Type.Unit) -> Some s
   | (Type.Var a, Type.Var b) when a=b -> Some s
   | (Type.Var a, _) -> if (occur a ty2) then None
     else Some (extend_subst s a ty2)
@@ -57,68 +60,75 @@ let (gen_var, reset_var) = let id = ref 96 in
 
 let rec type_of exp env subst =
   match exp with
-  | Ast.Bool _ -> (Type.Bool, subst)
-  | Ast.Int n -> (Type.Int, subst)
+  | Ast.Bool _ -> (Type.Bool, subst, env)
+  | Ast.Int n -> (Type.Int, subst, env)
   | Ast.Equal (a,b) ->
-    let (ta, subst1) = (type_of a env subst) in
+    let (ta, subst1, env) = (type_of a env subst) in
     let subst2 = (subst1 >>= (unifier ta Type.Int)) in
-    let (tb, subst3) = (type_of b env subst2) in
+    let (tb, subst3, env) = (type_of b env subst2) in
     let subst4 = (subst3 >>= (unifier tb Type.Int)) in
-    (Type.Bool, subst4)
+    (Type.Bool, subst4, env)
+  | Ast.Bind (k,v) ->
+    let (t, subst1, env) = type_of v env subst in
+    (Type.Unit, subst1, env_extend env k t)
   | Ast.Plus (a,b) ->
-    let (ta, subst1) = (type_of a env subst) in
+    let (ta, subst1, env) = (type_of a env subst) in
     let subst2 = subst1 >>= (unifier ta Type.Int) in
-    let (tb, subst3) = (type_of b env subst2) in
+    let (tb, subst3, env) = (type_of b env subst2) in
     let subst4 = subst3 >>= (unifier tb Type.Int) in
-    (Type.Int, subst4)
+    (Type.Int, subst4, env)
   | Ast.Sub (a,b) ->
-    let (ta, subst1) = (type_of a env subst) in
+    let (ta, subst1, env) = (type_of a env subst) in
     let subst2 = subst1 >>= (unifier ta Type.Int) in
-    let (tb, subst3) = (type_of b env subst2) in
+    let (tb, subst3, env) = (type_of b env subst2) in
     let subst4 = subst3 >>= (unifier tb Type.Int) in
-    (Type.Int, subst4)
+    (Type.Int, subst4, env)
   | Ast.If (a,b,c) ->
-    let (ta, subst1) = type_of a env subst in
+    let (ta, subst1, env) = type_of a env subst in
     let subst2 = subst1 >>= (unifier ta Type.Bool) in
-    let (tb, subst3) = type_of b env subst2 in
-    let (tc, subst4) = type_of c env subst3 in
+    let (tb, subst3, env) = type_of b env subst2 in
+    let (tc, subst4, env) = type_of c env subst3 in
     let subst5 = subst4 >>= (unifier tb tc) in
-    (tb, subst5)
-  | Ast.Var n -> ((env_lookup env n), subst)
+    (tb, subst5, env)
+  | Ast.Var n -> ((env_lookup env n), subst, env)
   | Ast.Fun (vars,body) -> (match vars with
-    | [] -> failwith "fuck..1"
-    | x::[] -> let tv = gen_var () in
-      let (ty, subst1) = type_of_body body (env_extend env x tv) subst in
-      (Type.Fun (tv, ty), subst1)
-    | x::xs -> let tv = gen_var () in
-      let (ty, subst1) = type_of (Ast.Fun (xs, body)) (env_extend env x tv) subst in
-      (Type.Fun (tv, ty), subst1))
+      | [] -> failwith "fuck..1"
+      | x::[] -> let tv = gen_var () in
+        let (ty, subst1, env) = type_of_body body (env_extend env x tv) subst in
+        (Type.Fun (tv, ty), subst1, env)
+      | x::xs -> let tv = gen_var () in
+        let (ty, subst1, env) = type_of (Ast.Fun (xs, body)) (env_extend env x tv) subst in
+        (Type.Fun (tv, ty), subst1, env))
+  | Ast.Fun1 (vars, body) -> type_of (Ast.Fun (vars, body)) env subst
   | Ast.App (rator,rands) -> type_of_app rator (List.rev rands) env subst
   | _ -> failwith "not support yet"
 and type_of_body ls env subst =
   match ls with
   | [] -> failwith "fuck you"
   | x::[] -> type_of x env subst
-  | x::xs -> failwith "not implement yet"
+  | x::xs ->
+    let (tx, subst1, env) = (type_of x env subst) in
+    let subst2 = subst1 >>= unifier tx Type.Unit in
+    type_of_body xs env subst2
 and type_of_app rator rev_rands env subst =
-    (match rev_rands with
-    | [] -> failwith "should never run here"
-    | x::[] ->
-      let result_type = gen_var () in
-      let (rator_type, subst1) = type_of rator env subst in
-      let (rand_type, subst2) = type_of x env subst1 in
-      let subst3 = subst2 >>= (unifier rator_type (Type.Fun (rand_type, result_type))) in
-      (result_type, subst3)
-    | x::xs ->
-      let result_type = gen_var () in
-      let (rator_type, subst1) = type_of_app rator xs env subst in
-      let (rand_type, subst2) = type_of x env subst1 in
-      let subst3 = subst2 >>= (unifier rator_type (Type.Fun (rand_type, result_type))) in
-      (result_type, subst3))
+  (match rev_rands with
+   | [] -> failwith "should never run here"
+   | x::[] ->
+     let result_type = gen_var () in
+     let (rator_type, subst1, env) = type_of rator env subst in
+     let (rand_type, subst2, env) = type_of x env subst1 in
+     let subst3 = subst2 >>= (unifier rator_type (Type.Fun (rand_type, result_type))) in
+     (result_type, subst3, env)
+   | x::xs ->
+     let result_type = gen_var () in
+     let (rator_type, subst1, env) = type_of_app rator xs env subst in
+     let (rand_type, subst2, env) = type_of x env subst1 in
+     let subst3 = subst2 >>= (unifier rator_type (Type.Fun (rand_type, result_type))) in
+     (result_type, subst3, env))
 
 let infer exp =
   let () = reset_var () in
-  let (ty, subst) = type_of exp [] (Some []) in
+  let (ty, subst, env) = type_of exp [] (Some []) in
   match subst with
   | Some s -> update_type ty s
   | None -> failwith "false"

@@ -112,6 +112,13 @@ x := (if a
 
 let loop x =
     loop x+1
+    
+跟scheme里面的begin是一个概念，函数里面是多个表达式，或者begin里面还多个表达式
+
+(lambda () x1 x2 x3) 等价于 (lambda () (begin x1 x2 x3))
+于是只需要支持(begin x1 x2 x3)，在lambda不需要支持多个表达式
+我们只是把(begin x1 x2 x3)换成了{x1; x2; x3}
+
 
 ## 类型推导
 
