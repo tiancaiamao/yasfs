@@ -13,14 +13,18 @@
 .mly.mli:
 	ocamlyacc $(OFLAGS) $(INCLUDES) $<
 
-all: lib
+OBJS = ast.cmo lambda.cmo type.cmo instruct.cmo lexer.cmo parser.cmo bruijn.cmo zinc.cmo infer.cmo driver.cmo
 
-lib:zen.cma
+DEPEND += lexer.ml parser.ml parser.mli
 
-zen.cma : ast.cmo lambda.cmo type.cmo instruct.cmo lexer.cmo parser.cmo bruijn.cmo zinc.cmo infer.cmo driver.cmo
-	ocamlc -o zen.cma -a $^
+all: .depend lib
 
-zinc.cmo : lambda.cmo ast.cmo instruct.cmo
+include .depend
+
+lib: zen.cma
+
+zen.cma : $(DEPEND) $(OBJS)
+	ocamlc -o zen.cma -a $(OBJS)
 
 test : zinc_test driver_test bruijn_test infer_test
 
@@ -36,17 +40,8 @@ driver_test: zen.cma
 bruijn_test: zen.cma
 	ocaml zen.cma bruijn_test.ml
 
-bruijn.cmo: bruijn.ml lambda.cmo ast.cmo
-
-parser.cmo:parser.ml parser.cmi ast.cmo
-
-lexer.cmo: parser.cmo
-
-driver.cmo: infer.cmo parser.cmo bruijn.cmo zinc.cmo
-
-parser.cmi: parser.mli ast.cmo
-
-infer.cmo: type.cmo ast.cmo
-
 clean:
 	rm -rf parser.ml parser.mli lexer.ml *.cmo *.cmi *.cma
+
+.depend: $(DEPEND)
+	ocamldep $(INCLUDE) *.mli *.ml > .depend
