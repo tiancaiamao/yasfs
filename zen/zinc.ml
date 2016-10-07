@@ -6,6 +6,8 @@ let repeat n v =
 let rec compile exp code = match exp with
     Lambda.Int v -> (Instruct.Const v)::code
   | Lambda.Bool v -> (Instruct.Bool v)::code
+  | Lambda.Tuple vs -> let n = (List.length vs) in
+    (List.flatten (List.map (fun x -> compile x []) vs)) @ (Instruct.MakeTuple n)::code
   | Lambda.Var n -> (Instruct.Access n)::code
   | Lambda.Bind t -> compile t (Instruct.Bind::code)
   | Lambda.Fun (n,ts) ->
@@ -30,6 +32,9 @@ let rec compile exp code = match exp with
 and compile_tail exp = match exp with
     Lambda.Int v -> [Instruct.Const v]
   | Lambda.Bool v -> [Instruct.Bool v]
+  | Lambda.Tuple vs -> let n = (List.length vs) in
+    (List.flatten (List.map (fun x -> compile x []) vs)) @
+    [Instruct.MakeTuple n; Instruct.Return]
   | Lambda.Var n -> [Instruct.Access n; Instruct.Return]
   | Lambda.Bind t -> [Instruct.Bind]
   | Lambda.Plus _ -> compile exp [Instruct.Return]
@@ -60,6 +65,7 @@ and compile_body ts = match ts with
 type result =
     Value of int
   | Bool of bool
+  | Tuple of result list
   | Lambda of (Instruct.t list * result list)
   | Eplison
 
@@ -71,6 +77,11 @@ let step (c, e, s, r) op =
   match op with
   Instruct.Bool v -> Stack.push (Bool v) s; (c, e, s, r)
   | Instruct.Const v -> Stack.push (Value v) s; (c, e, s, r)
+  | Instruct.MakeTuple n ->
+    let rec loop i n res =
+      if i=n then begin Stack.push (Tuple res) s; (c, e, s, r) end
+      else loop (i+1) n ((Stack.pop s)::res)
+    in loop 0 n []
   | Instruct.Pop -> Stack.pop s |> ignore; (c, e, s, r)
   | Instruct.Plus -> (match Stack.pop s with
     | Value x -> (match Stack.pop s with

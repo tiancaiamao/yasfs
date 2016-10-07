@@ -17,6 +17,8 @@ rule token = parse
     { LBRACE }
 | '}'
     { RBRACE }
+| ','
+    { COMMA }
 | ';'
     { SEMICOLON }
 | digit+

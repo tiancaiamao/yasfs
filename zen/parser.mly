@@ -4,6 +4,7 @@
 
 %token ARROW
 %token ARROW2
+%token COMMA
 %token BIND
 %token <int> INT
 %token <string> IDENT
@@ -67,6 +68,8 @@ exp:
     { Mul($1, $3) }
 | exp EQUAL exp
     { Equal($1, $3) }
+| LPAREN tuple RPAREN
+    { Tuple $2 }
 | IF exp THEN exp ELSE exp
     { If($2, $4, $6) }
 | IDENT BIND exp
@@ -82,6 +85,12 @@ fn_body:
   { $2 }
 | exp
   { [$1] }
+
+tuple:
+| exp COMMA exp
+  { [$1; $3] }
+| exp COMMA tuple
+  { $1::$3 }
 
 exp_list:
 | exp SEMICOLON exp_list

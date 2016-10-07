@@ -69,6 +69,20 @@ fn f x y =>
    f x+1 y-1;
 
 没有let in的概念
+还是引入let in
+
+Y (fn fact ->
+      fn n ->
+          if n=0 then 1 else n*(fact (n-1)))
+          
+等价于
+
+fn fact n => if n=0 then 1 else n*(fact (n-1))
+
+用let来导出
+let fact = fn fact n => ... in
+等价于
+let fn fact n => ... in
 
 ## ;; 与 ; 以及{}
 
@@ -128,6 +142,8 @@ let loop x =
 
 类型推导坑很深，目前决定还是采用type infer这个feature，但是只支持最简单的推导。
 
+做type infer全部转化成带类型的lambda演算了再做，可以简化问题
+
 HM系统的问题：
 
 fn id x => x
@@ -138,3 +154,46 @@ fn id x => x
 用::符号声明函数
 
     (>>=)  :: Maybe a -> (a -> Maybe b) -> Maybe b
+
+类型标注用[]括号包起来
+fn id:[Bool->Bool] x:[Bool] => x
+
+加一层，从sugar层到typed lambda演算层，typed lambda演算完全使用TAPL的
+
+## 泛型
+
+不支持泛型，泛型给语法带来的复杂性大于它的实用价值
+
+我认为几乎只有在容器类型数据结构的时候需要用到泛型，引入了过多的复杂性，增加了实现难度，为此是不值得的
+
+## 元组，记录，以及Union类型
+
+元组 类型记法：
+{Int, Bool, String}
+值记法：
+{1, true, "xxx"} 
+访问方法
+{1, true, "xxx"}.0 = 1
+{1, true, "xxx"}.1 = true
+{1, true, "xxx"}.2 = "xxx"
+
+记录是带名字的元组，其它语言中的结构体
+类型记法：
+{field1: Int, field2: Bool, field3: String}
+值记法：
+{field1=1, field2=true, field3="xxx"}
+
+元组是记录的简化，等价于
+{Int, Bool, String} == {0:Int, 1:Bool, 2: String}
+
+union类型是有价值的
+类型记法：
+<some: Int, none: Unit>
+值记法：
+<some=3>
+
+union类型引入以及需要增加模式匹配。
+x = <some=3>
+case x of 
+| <some v> -> v
+| <none> -> 0

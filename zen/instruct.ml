@@ -1,6 +1,7 @@
 type t =
     Const of int
   | Bool of bool
+  | MakeTuple of int
   | Access of int
   | Closure of t list
   | Tailapply

@@ -6,6 +6,7 @@ type t =
   | Fun of string list * t list
   | Fun1 of string list * t list
   | Bind of string * t
+  | Tuple of t list
   | If of t * t * t
   | Plus of t * t
   | Sub of t * t

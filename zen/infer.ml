@@ -4,6 +4,8 @@ let rec subst t0 v t =
   | Type.Int -> Type.Int
   | Type.Bool -> Type.Bool
   | Type.Var s -> if s = v then t else t0
+  | Type.Tuple ts ->
+    Type.Tuple (List.map (fun x -> subst x v t) ts)
   | Type.Fun (arg,ret) ->
     Type.Fun (subst arg v t, subst ret v t)
 
@@ -14,6 +16,8 @@ let rec update_type t subst =
   | Type.Bool -> Type.Bool
   | Type.Fun (arg,ret) ->
     Type.Fun (update_type arg subst, update_type ret subst)
+  | Type.Tuple ts ->
+    Type.Tuple (List.map (fun x -> update_type x subst) ts)
   | Type.Var v -> try List.assoc v subst with _ -> t
 
 let extend_subst s v t =
@@ -24,6 +28,8 @@ let rec occur v t =
   | Type.Var v1 -> v = v1
   | Type.Fun (arg,ret) ->
     (occur v arg) || (occur v ret)
+  | Type.Tuple ts ->
+    List.exists (occur v) ts
   | _ -> false
 
 (* 'a M -> ('a -> 'b M) -> 'b M *)
@@ -48,6 +54,13 @@ let rec unifier t1 t2 s =
     (Some s)
     >>= (unifier a1 a2)
     >>= (unifier e1 e2)
+  | (Type.Tuple t1s, Type.Tuple t2s) ->
+    unifier_list t1s t2s s
+  | _ -> None
+and unifier_list t1s t2s s =
+  match (t1s,t2s) with
+  | ([],[]) -> Some s
+  | (x::xs, y::ys) -> (unifier x y s) >>= (unifier_list xs ys)
   | _ -> None
 
 let env_lookup env n = List.assoc n env
@@ -105,6 +118,9 @@ let rec type_of exp env subst =
       | x::xs -> let tv = gen_var () in
         let (ty, subst1, env) = type_of (Ast.Fun (xs, body)) (env_extend env x tv) subst in
         (Type.Fun (tv, ty), subst1, env))
+  | Ast.Tuple vs ->
+    let ts = List.map (fun v -> let (t, s, e) = (type_of v env subst) in t) vs in
+    (Type.Tuple ts, subst, env)
   | Ast.Fun1 (vars, body) ->
     let (t, subst1, env) = type_of (Ast.Fun (vars, body)) env subst in
     (match t with

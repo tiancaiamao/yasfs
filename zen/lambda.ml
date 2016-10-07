@@ -2,6 +2,7 @@ type t =
     Int of int
   | Bool of bool
   | Var of int
+  | Tuple of t list
   | App of t * t list
   | Fun of int * t list
   | Fun1 of int * t list
