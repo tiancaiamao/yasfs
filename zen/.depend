@@ -1,6 +1,6 @@
 parser.cmi : ast.cmo
-ast.cmo :
-ast.cmx :
+ast.cmo : type.cmo
+ast.cmx : type.cmx
 bruijn.cmo : lambda.cmo ast.cmo
 bruijn.cmx : lambda.cmx ast.cmx
 bruijn_test.cmo : lambda.cmo bruijn.cmo ast.cmo
@@ -21,8 +21,6 @@ lexer.cmo : parser.cmi
 lexer.cmx : parser.cmx
 parser.cmo : ast.cmo parser.cmi
 parser.cmx : ast.cmx parser.cmi
-syntax.cmo :
-syntax.cmx :
 type.cmo :
 type.cmx :
 zinc.cmo : lambda.cmo instruct.cmo

@@ -5,3 +5,4 @@ type t =
   | Var of char
   | Unit
   | Tuple of t list
+  | Union of string * (string * t) list

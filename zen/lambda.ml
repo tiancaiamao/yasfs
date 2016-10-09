@@ -12,3 +12,6 @@ type t =
   | Mul of t * t
   | Sub of t * t
   | Equal of t * t
+  | Prim of string
+  | Switch of t * t list
+  | Case of int * t

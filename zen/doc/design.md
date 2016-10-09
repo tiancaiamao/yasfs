@@ -169,31 +169,52 @@ fn id:[Bool->Bool] x:[Bool] => x
 ## 元组，记录，以及Union类型
 
 元组 类型记法：
-{Int, Bool, String}
+(Int, Bool, String)
 值记法：
-{1, true, "xxx"} 
+(1, true, "xxx")
 访问方法
-{1, true, "xxx"}.0 = 1
-{1, true, "xxx"}.1 = true
-{1, true, "xxx"}.2 = "xxx"
+(1, true, "xxx").0 = 1
+(1, true, "xxx").1 = true
+(1, true, "xxx").2 = "xxx"
 
 记录是带名字的元组，其它语言中的结构体
 类型记法：
-{field1: Int, field2: Bool, field3: String}
+type T struct {
+    field1 Int,
+    field2 Bool,
+    field3 String,
+}
 值记法：
-{field1=1, field2=true, field3="xxx"}
+T{field1=1,
+field2=true,
+field3="xxx"}
 
 元组是记录的简化，等价于
-{Int, Bool, String} == {0:Int, 1:Bool, 2: String}
+(Int, Bool, String) == T{0:Int, 1:Bool, 2: String}
 
 union类型是有价值的
 类型记法：
-<some: Int, none: Unit>
+type option union {
+    Some int,
+    None unit,
+}
 值记法：
-<some=3>
+option{Some=3}
 
 union类型引入以及需要增加模式匹配。
-x = <some=3>
-case x of 
-| <some v> -> v
-| <none> -> 0
+x = option{Some=3}
+switch x as option {
+    case Some a: 3
+    case None: 5
+}
+这样子设计，从switch表达式就可以推断出x的类型是option，就像 + 直接推断出两边是int类型
+
+ocaml的match with语法设计有点缺陷，因为没有结束标记，嵌套时会有麻烦，需要加括号
+
+match x with 
+| Some a ->
+    (match x with 
+    | _ -> true)
+| None -> false
+
+不加括号就没法区分 | None -> false是属于哪个match的，还是显示的用{}比较好

@@ -1,3 +1,7 @@
+type typedef =
+  | Union of string * (string * Type.t) list
+  | Struct of string * (string * Type.t) list
+
 type t =
     Int of int
   | Bool of bool
@@ -12,3 +16,5 @@ type t =
   | Sub of t * t
   | Mul of t * t
   | Equal of t * t
+  | Construct of string * t
+  | Switch of t * string * (string * t) list
