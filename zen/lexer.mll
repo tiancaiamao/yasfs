@@ -47,6 +47,8 @@ rule token = parse
     { TRUE }
 | "false"
     { FALSE }
+| "union"
+    { UNION }
 | ":="
     { BIND }
 | eof

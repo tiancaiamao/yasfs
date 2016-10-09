@@ -5,6 +5,7 @@
 %token ARROW
 %token ARROW2
 %token COMMA
+%token UNION
 %token BIND
 %token <int> INT
 %token <string> IDENT
@@ -51,9 +52,17 @@ simple_exp:
 | FALSE
     { Bool(false) }
 
+field_assign_list:
+| IDENT EQUAL exp
+    { [($1, $3)] }
+| IDENT EQUAL exp COMMA field_assign_list
+    { ($1,$3)::$5 }
+
 exp:
 | simple_exp
     { $1 }
+| IDENT LBRACE field_assign_list RBRACE
+    { Construct($1, $3) }
 | FN formal_args ARROW fn_body
     { Fun($2, $4) }
 | FN formal_args ARROW2 fn_body

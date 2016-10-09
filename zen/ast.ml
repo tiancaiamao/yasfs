@@ -16,5 +16,5 @@ type t =
   | Sub of t * t
   | Mul of t * t
   | Equal of t * t
-  | Construct of string * t
+  | Construct of string * (string * t) list
   | Switch of t * string * (string * t) list

@@ -21,6 +21,14 @@ let rec compile exp code = match exp with
     Instruct.Pushmark::(List.fold_left (fun a b -> compile b a) init ts)
   | Lambda.If (t, succ, fail) ->
     compile t [Instruct.Branch ((compile succ code), (compile fail code))]
+  | Lambda.Switch (t, cases) ->
+    let rec handle cases code =
+      match cases with
+      | [] -> code
+      | (ith, case)::xs ->
+      [Instruct.Copy; (Instruct.Const ith); Instruct.Equal;
+       (Instruct.Branch ((compile case code), (handle xs code)))] in
+    compile t (handle cases code)
   | Lambda.Plus (a, b) ->
     compile a (compile b (Instruct.Plus::code))
   | Lambda.Sub (a, b) ->

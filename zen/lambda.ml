@@ -13,5 +13,5 @@ type t =
   | Sub of t * t
   | Equal of t * t
   | Prim of string
-  | Switch of t * t list
-  | Case of int * t
+  | Switch of t * case list
+and case = int * t

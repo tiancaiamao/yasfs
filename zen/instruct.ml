@@ -7,6 +7,7 @@ type t =
   | Tailapply
   | Apply
   | Pushmark
+  | Copy
   | Pop
   | Grab
   | Return

@@ -56,4 +56,4 @@ let rec ast2lambda env ast = match ast with
 and case2lambda field term ty env =
     let idx = field2index field ty in
     let lam = ast2lambda env term in
-    Lambda.Case (idx, lam)
+    (idx, lam)
