@@ -30,6 +30,7 @@ let rec compile exp code = match exp with
       [Instruct.Copy; (Instruct.Const ith); Instruct.Equal;
        (Instruct.Branch ((compile case code), (handle xs code)))] in
     compile t (handle cases code)
+  | Lambda.Prim s -> (Instruct.Prim s)::code
   | Lambda.Plus (a, b) ->
     compile a (compile b (Instruct.Plus::code))
   | Lambda.Sub (a, b) ->
@@ -41,6 +42,7 @@ let rec compile exp code = match exp with
 and compile_tail exp = match exp with
     Lambda.Int v -> [Instruct.Const v]
   | Lambda.Bool v -> [Instruct.Bool v]
+  | Lambda.Prim s -> [Instruct.Prim s]
   | Lambda.Tuple vs -> let n = (List.length vs) in
     (List.flatten (List.map (fun x -> compile x []) vs)) @
     [Instruct.MakeTuple n; Instruct.Return]
@@ -48,6 +50,7 @@ and compile_tail exp = match exp with
     [Instruct.MakeTuple tag; Instruct.Return]
   | Lambda.Var n -> [Instruct.Access n; Instruct.Return]
   | Lambda.Bind t -> [Instruct.Bind]
+  | Lambda.Switch _ -> compile exp [Instruct.Return]
   | Lambda.Plus _ -> compile exp [Instruct.Return]
   | Lambda.Sub _ -> compile exp [Instruct.Return]
   | Lambda.Mul _ -> compile exp [Instruct.Return]
@@ -78,6 +81,7 @@ type result =
   | Bool of bool
   | Tuple of result list
   | Union of int * result
+  | Prim of string
   | Lambda of (Instruct.t list * result list)
   | Eplison
 
@@ -89,6 +93,7 @@ let step (c, e, s, r) op =
   match op with
   Instruct.Bool v -> Stack.push (Bool v) s; (c, e, s, r)
   | Instruct.Const v -> Stack.push (Value v) s; (c, e, s, r)
+  | Instruct.Prim str -> Stack.push (Prim str) s; (c, e, s, r)
   | Instruct.MakeTuple n ->
     let rec loop i n res =
       if i=n then begin Stack.push (Tuple res) s; (c, e, s, r) end
@@ -97,6 +102,7 @@ let step (c, e, s, r) op =
   | Instruct.MakeUnion tag ->
     Stack.push (Union (tag, (Stack.pop s))) s; (c, e, s, r)
   | Instruct.Pop -> Stack.pop s |> ignore; (c, e, s, r)
+  | Instruct.Copy -> Stack.push (Stack.top s) s |> ignore; (c, e, s, r)
   | Instruct.Plus -> (match Stack.pop s with
     | Value x -> (match Stack.pop s with
         | Value y -> Stack.push (Value (x+y)) s;
@@ -135,11 +141,17 @@ let step (c, e, s, r) op =
       | _ -> failwith "cannot tailapply with non closure" in
     (c1, e1, s, r)
   | Instruct.Apply ->
-    Stack.push (Lambda (c,e)) r;
-    let (c1,e1) = match Stack.top s with
-        Lambda x -> x
-      | _ -> failwith "cannot apply non closure" in
-    (c1, e1, s, r)
+    (match Stack.top s with
+     | Lambda (c1, e1) ->
+       Stack.push (Lambda (c,e)) r;
+       (c1, e1, s, r)
+     | Prim str -> if str = "tag" then
+         (Stack.pop s |> ignore;
+         match Stack.top s with
+          | Union (tag, res) -> Stack.push (Value tag) s; (c, e, s, r)
+          | _ -> assert false)
+       else assert false
+     | _ -> failwith "cannot apply non closure")
   | Instruct.Pushmark -> Stack.push Eplison s; (c, e, s, r)
   | Instruct.Grab ->
     if Stack.top s = Eplison then

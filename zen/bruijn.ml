@@ -49,7 +49,7 @@ let rec ast2lambda env ast = match ast with
   | Ast.If (test, succ, fail) -> Lambda.If (
     (ast2lambda env test), (ast2lambda env succ), (ast2lambda env fail))
   | Ast.Switch (n, tn, cs) ->
-    let ty = name2type tn in
+    let ty = Hashtbl.find Global.g_t_env tn in
     let tag = Lambda.App (Lambda.Prim "tag", [ast2lambda env n]) in
     let body = (List.map (fun (n,t) -> case2lambda (Type.Field n) t ty env) cs) in
     Lambda.Switch (tag, body)

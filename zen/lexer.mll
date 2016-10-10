@@ -57,8 +57,14 @@ rule token = parse
     { UNION }
 | "struct"
     { STRUCT }
+| "switch"
+    { SWITCH }
+| "case"
+    { CASE }
 | "type"
     { TYPE }
+| ':'
+    { COLON }
 | ":="
     { BIND }
 | eof

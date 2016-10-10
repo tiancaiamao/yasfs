@@ -3,6 +3,7 @@ type t =
   | Bool of bool
   | MakeTuple of int
   | MakeUnion of int
+  | Prim of string
   | Access of int
   | Closure of t list
   | Tailapply

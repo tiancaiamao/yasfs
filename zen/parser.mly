@@ -5,6 +5,7 @@
 %token ARROW
 %token ARROW2
 %token COMMA
+%token COLON
 %token UNION
 %token STRUCT
 %token TYPE
@@ -27,6 +28,8 @@
 %token IF
 %token THEN
 %token ELSE
+%token SWITCH
+%token CASE
 %token EQUAL
 %token EOF
 %token SEMICOLON
@@ -90,11 +93,19 @@ field_assign_list:
 | IDENT EQUAL exp COMMA field_assign_list
     { ($1,$3)::$5 }
 
+case_list:
+| CASE IDENT COLON exp
+  { [($2,$4)] }
+| CASE IDENT COLON exp case_list
+  { ($2,$4)::$5 }
+
 exp:
 | simple_exp
     { $1 }
 | IDENT LBRACE field_assign_list RBRACE
     { Construct($1, $3) }
+| SWITCH exp IDENT LBRACE case_list RBRACE 
+    { Switch($2, $3, $5) }
 | FN formal_args ARROW fn_body
     { Fun($2, $4) }
 | FN formal_args ARROW2 fn_body
