@@ -6,6 +6,8 @@
 %token ARROW2
 %token COMMA
 %token UNION
+%token STRUCT
+%token TYPE
 %token BIND
 %token <int> INT
 %token <string> IDENT
@@ -29,16 +31,26 @@
 %left PLUS
 
 %type <Ast.t> exp
-%type <Ast.t list> top
+%type <Ast.item list> top
 %start top
 
 %%
 
 top:
-| exp
+| type_or_exp
   { [$1] }
-| exp_list
-  { $1 }
+| type_or_exp SEMICOLON top
+  { $1::$3 }
+
+type_or_exp:
+| exp
+  { Expr $1 }
+| typedef
+  { Type $1 }
+
+typedef:
+| TYPE IDENT UNION LBRACE IDENT RBRACE
+  { Union ($2,$5) }
 
 simple_exp:
 | LPAREN exp RPAREN

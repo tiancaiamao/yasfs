@@ -49,6 +49,10 @@ rule token = parse
     { FALSE }
 | "union"
     { UNION }
+| "struct"
+    { STRUCT }
+| "type"
+    { TYPE }
 | ":="
     { BIND }
 | eof

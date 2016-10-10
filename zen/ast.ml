@@ -1,5 +1,6 @@
 type typedef =
-  | Union of string * (string * Type.t) list
+  (* | Union of string * (string * Type.t) list *)
+  | Union of string * string
   | Struct of string * (string * Type.t) list
 
 type t =
@@ -18,3 +19,7 @@ type t =
   | Equal of t * t
   | Construct of string * (string * t) list
   | Switch of t * string * (string * t) list
+
+type item =
+  | Type of typedef
+  | Expr of t

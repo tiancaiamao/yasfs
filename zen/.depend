@@ -5,8 +5,10 @@ bruijn.cmo : type.cmo lambda.cmo ast.cmo
 bruijn.cmx : type.cmx lambda.cmx ast.cmx
 bruijn_test.cmo : lambda.cmo bruijn.cmo ast.cmo
 bruijn_test.cmx : lambda.cmx bruijn.cmx ast.cmx
-driver.cmo : zinc.cmo parser.cmi lexer.cmo instruct.cmo infer.cmo bruijn.cmo
-driver.cmx : zinc.cmx parser.cmx lexer.cmx instruct.cmx infer.cmx bruijn.cmx
+driver.cmo : zinc.cmo parser.cmi lexer.cmo instruct.cmo infer.cmo bruijn.cmo \
+    ast.cmo
+driver.cmx : zinc.cmx parser.cmx lexer.cmx instruct.cmx infer.cmx bruijn.cmx \
+    ast.cmx
 driver_test.cmo : zinc.cmo driver.cmo
 driver_test.cmx : zinc.cmx driver.cmx
 infer.cmo : type.cmo ast.cmo
