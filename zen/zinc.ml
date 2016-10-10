@@ -8,6 +8,7 @@ let rec compile exp code = match exp with
   | Lambda.Bool v -> (Instruct.Bool v)::code
   | Lambda.Tuple vs -> let n = (List.length vs) in
     (List.flatten (List.map (fun x -> compile x []) vs)) @ (Instruct.MakeTuple n)::code
+  | Lambda.Union (tag, e) -> (compile e []) @ (Instruct.MakeUnion tag)::code
   | Lambda.Var n -> (Instruct.Access n)::code
   | Lambda.Bind t -> compile t (Instruct.Bind::code)
   | Lambda.Fun (n,ts) ->
@@ -43,6 +44,8 @@ and compile_tail exp = match exp with
   | Lambda.Tuple vs -> let n = (List.length vs) in
     (List.flatten (List.map (fun x -> compile x []) vs)) @
     [Instruct.MakeTuple n; Instruct.Return]
+  | Lambda.Union (tag, e) -> (compile e []) @
+    [Instruct.MakeTuple tag; Instruct.Return]
   | Lambda.Var n -> [Instruct.Access n; Instruct.Return]
   | Lambda.Bind t -> [Instruct.Bind]
   | Lambda.Plus _ -> compile exp [Instruct.Return]
@@ -74,6 +77,7 @@ type result =
     Value of int
   | Bool of bool
   | Tuple of result list
+  | Union of int * result
   | Lambda of (Instruct.t list * result list)
   | Eplison
 
@@ -90,6 +94,8 @@ let step (c, e, s, r) op =
       if i=n then begin Stack.push (Tuple res) s; (c, e, s, r) end
       else loop (i+1) n ((Stack.pop s)::res)
     in loop 0 n []
+  | Instruct.MakeUnion tag ->
+    Stack.push (Union (tag, (Stack.pop s))) s; (c, e, s, r)
   | Instruct.Pop -> Stack.pop s |> ignore; (c, e, s, r)
   | Instruct.Plus -> (match Stack.pop s with
     | Value x -> (match Stack.pop s with

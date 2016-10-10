@@ -53,6 +53,15 @@ let rec ast2lambda env ast = match ast with
     let tag = Lambda.App (Lambda.Prim "tag", [ast2lambda env n]) in
     let body = (List.map (fun (n,t) -> case2lambda (Type.Field n) t ty env) cs) in
     Lambda.Switch (tag, body)
+  | Ast.Construct (tn, vals) ->
+    let ty = Hashtbl.find Global.g_t_env tn in
+    match ty with
+    | Type.Union (n , ls) ->
+      if List.length vals > 1 then assert false else
+        let (field, t) = List.hd vals in
+        let tag = field2index (Type.Field field) ty in
+        Lambda.Union (tag, ast2lambda env t)
+    | _ -> assert false
 and case2lambda field term ty env =
     let idx = field2index field ty in
     let lam = ast2lambda env term in

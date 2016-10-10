@@ -2,6 +2,8 @@ open Zinc
 
 let get_expr = function Ast.Expr x -> Some x | _ -> None
 
+let get_typedef = function Ast.Typedef (n,v) -> Some (n,v) |_ -> None
+
 let filter_map f ls =
   let ff ls x = match f x with
     | None -> ls
@@ -9,6 +11,9 @@ let filter_map f ls =
   List.fold_left ff [] ls
 
 let step_parse str = Parser.top Lexer.token (Lexing.from_string str)
+
+let step_typedef ast =
+  ast |> (filter_map get_typedef) |> (List.iter Global.add_t_env)
 
 let step_infer ast =
    ast |> (filter_map get_expr) |> Infer.infer_list
