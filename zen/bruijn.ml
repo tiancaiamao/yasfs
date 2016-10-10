@@ -7,7 +7,7 @@ let find_env e v =
 
 let extend_env env v = (List.rev v) @ env
 
-let name2type n = Type.Union ("sb", ["field", Type.Int])
+let name2type n = Type.Union (Type.Name "sb", [Type.Field "field", Type.Int])
 
 let rec find_in_list name lst i =
   match lst with
@@ -51,7 +51,7 @@ let rec ast2lambda env ast = match ast with
   | Ast.Switch (n, tn, cs) ->
     let ty = name2type tn in
     let tag = Lambda.App (Lambda.Prim "tag", [ast2lambda env n]) in
-    let body = (List.map (fun (n,t) -> case2lambda n t ty env) cs) in
+    let body = (List.map (fun (n,t) -> case2lambda (Type.Field n) t ty env) cs) in
     Lambda.Switch (tag, body)
 and case2lambda field term ty env =
     let idx = field2index field ty in

@@ -21,8 +21,8 @@ lambda.cmo :
 lambda.cmx :
 lexer.cmo : parser.cmi
 lexer.cmx : parser.cmx
-parser.cmo : ast.cmo parser.cmi
-parser.cmx : ast.cmx parser.cmi
+parser.cmo : type.cmo ast.cmo parser.cmi
+parser.cmx : type.cmx ast.cmx parser.cmi
 type.cmo :
 type.cmx :
 zinc.cmo : lambda.cmo instruct.cmo

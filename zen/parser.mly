@@ -9,6 +9,9 @@
 %token STRUCT
 %token TYPE
 %token BIND
+%token KwINT
+%token KwBOOL
+%token KwUNIT
 %token <int> INT
 %token <string> IDENT
 %token PLUS
@@ -32,6 +35,7 @@
 
 %type <Ast.t> exp
 %type <Ast.item list> top
+%type <Type.t> type_t
 %start top
 
 %%
@@ -42,15 +46,31 @@ top:
 | type_or_exp SEMICOLON top
   { $1::$3 }
 
+field:
+| IDENT
+  { Type.Field $1 }
+
+field_type_list:
+| field type_t COMMA
+  { [($1, $2)] }
+| field type_t COMMA field_type_list
+  { ($1, $2)::$4 }
+
+type_t:
+| KwBOOL
+  { Type.Bool }
+| KwINT
+  { Type.Int }
+| KwUNIT
+  { Type.Unit }
+| type_t ARROW type_t
+  { Type.Fun ($1, $3) }
+
 type_or_exp:
 | exp
   { Expr $1 }
-| typedef
-  { Type $1 }
-
-typedef:
-| TYPE IDENT UNION LBRACE IDENT RBRACE
-  { Union ($2,$5) }
+| TYPE IDENT UNION LBRACE field_type_list RBRACE
+  { Typedef ($2, Union (Type.Name($2),$5)) }
 
 simple_exp:
 | LPAREN exp RPAREN

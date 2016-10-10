@@ -47,6 +47,12 @@ rule token = parse
     { TRUE }
 | "false"
     { FALSE }
+| "int"
+    { KwINT }
+| "bool"
+    { KwBOOL }
+| "unit"
+    { KwUNIT }
 | "union"
     { UNION }
 | "struct"
