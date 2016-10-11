@@ -8,6 +8,9 @@ let rec subst t0 v t =
     Type.Tuple (List.map (fun x -> subst x v t) ts)
   | Type.Fun (arg,ret) ->
     Type.Fun (subst arg v t, subst ret v t)
+  | Type.Union (name, fields) ->
+    let fn = fun (field, x) -> field, (subst x v t) in
+    Type.Union (name, List.map fn fields)
 
 let rec update_type t subst =
   match t with
@@ -18,6 +21,9 @@ let rec update_type t subst =
     Type.Fun (update_type arg subst, update_type ret subst)
   | Type.Tuple ts ->
     Type.Tuple (List.map (fun x -> update_type x subst) ts)
+  | Type.Union (name, fields) ->
+    let fn = fun (fields, x) -> fields, update_type x subst in
+    Type.Union (name, (List.map fn fields))
   | Type.Var v -> try List.assoc v subst with _ -> t
 
 let extend_subst s v t =
@@ -30,6 +36,8 @@ let rec occur v t =
     (occur v arg) || (occur v ret)
   | Type.Tuple ts ->
     List.exists (occur v) ts
+  | Type.Union (name, fields) ->
+    List.exists (fun (_, t1) -> occur v t1) fields
   | _ -> false
 
 (* 'a M -> ('a -> 'b M) -> 'b M *)
@@ -55,6 +63,11 @@ let rec unifier t1 t2 s =
     >>= (unifier a1 a2)
     >>= (unifier e1 e2)
   | (Type.Tuple t1s, Type.Tuple t2s) ->
+    unifier_list t1s t2s s
+  | (Type.Union (_, fields1), Type.Union (_, fields2)) ->
+    let seconder = fun (x,y) -> y in
+    let t1s = List.map seconder fields1 in
+    let t2s = List.map seconder fields2 in
     unifier_list t1s t2s s
   | _ -> None
 and unifier_list t1s t2s s =
@@ -121,6 +134,14 @@ let rec type_of exp env subst =
   | Ast.Tuple vs ->
     let ts = List.map (fun v -> let (t, s, e) = (type_of v env subst) in t) vs in
     (Type.Tuple ts, subst, env)
+  | Ast.Construct (name, fields) ->
+    (* TODO check fields *)
+    (Hashtbl.find Global.g_t_env name, subst, env)
+  | Ast.Switch (v, tn, cases) ->
+    let (tv, subst1, env) = type_of v env subst in
+    let ty = Hashtbl.find Global.g_t_env tn in
+    let subst2 = subst >>= unifier tv ty in
+    (ty, subst2, env)
   | Ast.Fun1 (vars, body) ->
     let (t, subst1, env) = type_of (Ast.Fun (vars, body)) env subst in
     (match t with
