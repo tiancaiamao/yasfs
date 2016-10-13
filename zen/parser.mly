@@ -8,7 +8,6 @@
 %token COLON
 %token UNION
 %token STRUCT
-%token TYPE
 %token BIND
 %token KwINT
 %token KwBOOL
@@ -37,27 +36,16 @@
 %left PLUS
 
 %type <Ast.t> exp
-%type <Ast.item list> top
-%type <Type.t> type_t
+%type <Ast.t list> top
 %start top
 
 %%
 
 top:
-| type_or_exp
+| exp
   { [$1] }
-| type_or_exp SEMICOLON top
+| exp SEMICOLON top
   { $1::$3 }
-
-field:
-| IDENT
-  { Type.Field $1 }
-
-field_type_list:
-| field type_t COMMA
-  { [($1, $2)] }
-| field type_t COMMA field_type_list
-  { ($1, $2)::$4 }
 
 type_t:
 | KwBOOL
@@ -68,12 +56,6 @@ type_t:
   { Type.Unit }
 | type_t ARROW type_t
   { Type.Fun ($1, $3) }
-
-type_or_exp:
-| exp
-  { Expr $1 }
-| TYPE IDENT UNION LBRACE field_type_list RBRACE
-  { Typedef ($2, Union (Type.Name($2),$5)) }
 
 simple_exp:
 | LPAREN exp RPAREN
@@ -87,12 +69,6 @@ simple_exp:
 | FALSE
     { Bool(false) }
 
-field_assign_list:
-| IDENT EQUAL exp
-    { [($1, $3)] }
-| IDENT EQUAL exp COMMA field_assign_list
-    { ($1,$3)::$5 }
-
 case_list:
 | CASE IDENT COLON exp
   { [($2,$4)] }
@@ -102,10 +78,8 @@ case_list:
 exp:
 | simple_exp
     { $1 }
-| IDENT LBRACE field_assign_list RBRACE
-    { Construct($1, $3) }
-| SWITCH exp IDENT LBRACE case_list RBRACE 
-    { Switch($2, $3, $5) }
+| SWITCH exp LBRACE case_list RBRACE 
+    { Switch($2, $4) }
 | FN formal_args ARROW fn_body
     { Fun($2, $4) }
 | FN formal_args ARROW2 fn_body

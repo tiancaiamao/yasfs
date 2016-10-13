@@ -7,17 +7,10 @@ let find_env e v =
 
 let extend_env env v = (List.rev v) @ env
 
-let name2type n = Type.Union (Type.Name "sb", [Type.Field "field", Type.Int])
-
 let rec find_in_list name lst i =
   match lst with
   | [] -> failwith "name not exist in list"
   | (n,_)::xs -> if n=name then i else find_in_list name xs (i+1)
-
-let field2index n = function
-  | Type.Union (_, ls) ->
-    find_in_list n ls 0
-  | _ -> failwith "field not in type"
 
 let (empty_env : string list) = []
 
@@ -48,21 +41,12 @@ let rec ast2lambda env ast = match ast with
   | Ast.Bind (n, t) -> ast2lambda (extend_env env [n]) t
   | Ast.If (test, succ, fail) -> Lambda.If (
     (ast2lambda env test), (ast2lambda env succ), (ast2lambda env fail))
-  | Ast.Switch (n, tn, cs) ->
-    let ty = Hashtbl.find Global.g_t_env tn in
-    let tag = Lambda.App (Lambda.Prim "tag", [ast2lambda env n]) in
-    let body = (List.map (fun (n,t) -> case2lambda (Type.Field n) t ty env) cs) in
-    Lambda.Switch (tag, body)
-  | Ast.Construct (tn, vals) ->
-    let ty = Hashtbl.find Global.g_t_env tn in
-    match ty with
-    | Type.Union (n , ls) ->
-      if List.length vals > 1 then assert false else
-        let (field, t) = List.hd vals in
-        let tag = field2index (Type.Field field) ty in
-        Lambda.Union (tag, ast2lambda env t)
-    | _ -> assert false
-and case2lambda field term ty env =
-    let idx = field2index field ty in
-    let lam = ast2lambda env term in
-    (idx, lam)
+(*   | Ast.Switch (n, tn, cs) -> *)
+(*     let ty = Hashtbl.find Global.g_t_env tn in *)
+(*     let tag = Lambda.App (Lambda.Prim "tag", [ast2lambda env n]) in *)
+(*     let body = (List.map (fun (n,t) -> case2lambda (Type.Field n) t ty env) cs) in *)
+(*     Lambda.Switch (tag, body) *)
+(* and case2lambda field term ty env = *)
+(*     let idx = field2index field ty in *)
+(*     let lam = ast2lambda env term in *)
+(*     (idx, lam) *)

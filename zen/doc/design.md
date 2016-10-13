@@ -166,6 +166,14 @@ fn id:[Bool->Bool] x:[Bool] => x
 
 我认为几乎只有在容器类型数据结构的时候需要用到泛型，引入了过多的复杂性，增加了实现难度，为此是不值得的
 
+泛型必须有，没有什么都表达不了
+
+[true, true, false, true] 这个类型是list<bool>
+[2, 3, 7, 8, 12] 这个类型是list<int>
+some 5 跟some true 是some对不同int和bool的实例化
+
+还是不要支持泛型...太复杂了
+
 ## 元组，记录，以及Union类型
 
 元组 类型记法：
@@ -218,3 +226,34 @@ match x with
 | None -> false
 
 不加括号就没法区分 | None -> false是属于哪个match的，还是显示的用{}比较好
+
+# tagged tuple
+
+// tag是很特殊的东西，它的**值**要参与到类型推导
+tagged tuple?
+
+? -> ? -> #CONS
+fn cons (x, y) { #CONS(x, y) }
+fn null () { #NULL() }
+fn car (x) { field 1 x }
+fn some (x) { #SOME(x) }
+fn unit (x) { #UNIT(X) }
+
+(tagged tuple len>=2, ?) -> ?
+fn cdr (x) { field 1 x }
+
+cons 3 (cons true (cons 1 #NULL()))
+
+#CONS(3, #CONS(true, #CONS(1, #NULL())))
+
+(NULL or CONS, ?, ?) -> INT -> INT
+fn length (ls, sum) {
+    switch ls {
+      case NULL: sum
+      case CONS: length (cdr ls) (sum+1)
+    }
+}
+
+fn tree_node (x, y) { #TreeNode(x, y) }
+fn leaf (x) { #Leaf(x) }
+

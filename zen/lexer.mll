@@ -61,8 +61,6 @@ rule token = parse
     { SWITCH }
 | "case"
     { CASE }
-| "type"
-    { TYPE }
 | ':'
     { COLON }
 | ":="

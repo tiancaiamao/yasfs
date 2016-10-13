@@ -1,12 +1,11 @@
-type name = Name of string
-
-type field = Field of string
+type tag_tuple_constraint = CNone | CLeast of int | CExact of int
 
 type t =
     Int
   | Bool
+  | Unit
   | Fun of t * t
   | Var of char
-  | Unit
   | Tuple of t list
-  | Union of name * (field * t) list
+  | TagTuple of tag_tuple_desc
+and tag_tuple_desc = {tag: int;  size: tag_tuple_constraint; tuple: t list}

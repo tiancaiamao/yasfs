@@ -7,14 +7,10 @@ type t =
   | Fun1 of string list * t list
   | Bind of string * t
   | Tuple of t list
+  | TagTuple of string * t list
   | If of t * t * t
   | Plus of t * t
   | Sub of t * t
   | Mul of t * t
   | Equal of t * t
-  | Construct of string * (string * t) list
-  | Switch of t * string * (string * t) list
-
-type item =
-  | Typedef of string * Type.t
-  | Expr of t
+  | Switch of t * (string * t) list
