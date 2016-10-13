@@ -1,8 +1,8 @@
 parser.cmi : ast.cmo
 ast.cmo :
 ast.cmx :
-bruijn.cmo : lambda.cmo ast.cmo
-bruijn.cmx : lambda.cmx ast.cmx
+bruijn.cmo : lambda.cmo global.cmo ast.cmo
+bruijn.cmx : lambda.cmx global.cmx ast.cmx
 bruijn_test.cmo : lambda.cmo bruijn.cmo ast.cmo
 bruijn_test.cmx : lambda.cmx bruijn.cmx ast.cmx
 driver.cmo : zinc.cmo parser.cmi lexer.cmo instruct.cmo infer.cmo bruijn.cmo
@@ -11,8 +11,8 @@ driver_test.cmo : zinc.cmo driver.cmo
 driver_test.cmx : zinc.cmx driver.cmx
 global.cmo : type.cmo
 global.cmx : type.cmx
-infer.cmo : type.cmo ast.cmo
-infer.cmx : type.cmx ast.cmx
+infer.cmo : type.cmo global.cmo ast.cmo
+infer.cmx : type.cmx global.cmx ast.cmx
 infer_test.cmo : parser.cmi lexer.cmo infer.cmo
 infer_test.cmx : parser.cmx lexer.cmx infer.cmx
 instruct.cmo :

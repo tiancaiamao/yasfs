@@ -8,6 +8,9 @@ let rec subst t0 v t =
     Type.Tuple (List.map (fun x -> subst x v t) ts)
   | Type.Fun (arg,ret) ->
     Type.Fun (subst arg v t, subst ret v t)
+  | Type.TagTuple ts ->
+    Type.TagTuple (Type.make_tuple_desc ts.tag ts.size
+                  (List.map (fun x -> subst x v t) ts.tuple))
 
 let rec update_type t subst =
   match t with
@@ -18,6 +21,8 @@ let rec update_type t subst =
     Type.Fun (update_type arg subst, update_type ret subst)
   | Type.Tuple ts ->
     Type.Tuple (List.map (fun x -> update_type x subst) ts)
+  | Type.TagTuple ts ->
+    Type.TagTuple (Type.make_tuple_desc ts.tag ts.size (List.map (fun x -> update_type x subst) ts.tuple))
   | Type.Var v -> try List.assoc v subst with _ -> t
 
 let extend_subst s v t =
@@ -30,6 +35,8 @@ let rec occur v t =
     (occur v arg) || (occur v ret)
   | Type.Tuple ts ->
     List.exists (occur v) ts
+  | Type.TagTuple ts ->
+    List.exists (occur v) ts.tuple
   | _ -> false
 
 (* 'a M -> ('a -> 'b M) -> 'b M *)
@@ -121,6 +128,15 @@ let rec type_of exp env subst =
   | Ast.Tuple vs ->
     let ts = List.map (fun v -> let (t, s, e) = (type_of v env subst) in t) vs in
     (Type.Tuple ts, subst, env)
+  | Ast.TagTuple (str, vs) ->
+    let ts = List.map (fun v -> let (t, s, e) = (type_of v env subst) in t) vs in
+    (match Global.get_t_env str with
+    | None -> (Type.TagTuple (Global.add_t_env str ts), subst, env)
+    | Some x ->
+      if Type.check_size (List.length ts) x.size
+      then (Type.TagTuple x, subst, env)
+      else failwith "tag tuple size fail")
+
   (* | Ast.Switch (v, tn, cases) -> *)
   (*   let (tv, subst1, env) = type_of v env subst in *)
   (*   let ty = Hashtbl.find Global.g_t_env tn in *)

@@ -41,6 +41,10 @@ let rec ast2lambda env ast = match ast with
   | Ast.Bind (n, t) -> ast2lambda (extend_env env [n]) t
   | Ast.If (test, succ, fail) -> Lambda.If (
     (ast2lambda env test), (ast2lambda env succ), (ast2lambda env fail))
+  | Ast.TagTuple (str, ts) ->
+    let x = Hashtbl.find Global.g_t_env str in
+    Lambda.TagTuple (x.tag, (List.map (ast2lambda env) ts))
+
 (*   | Ast.Switch (n, tn, cs) -> *)
 (*     let ty = Hashtbl.find Global.g_t_env tn in *)
 (*     let tag = Lambda.App (Lambda.Prim "tag", [ast2lambda env n]) in *)

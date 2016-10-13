@@ -5,6 +5,7 @@
 %token ARROW
 %token ARROW2
 %token COMMA
+%token SHARP
 %token COLON
 %token UNION
 %token STRUCT
@@ -96,6 +97,12 @@ exp:
     { Equal($1, $3) }
 | LPAREN tuple RPAREN
     { Tuple $2 }
+| SHARP IDENT LPAREN RPAREN
+    { TagTuple ($2, []) }
+| SHARP IDENT LPAREN exp RPAREN
+    { TagTuple ($2, [$4]) }
+| SHARP IDENT LPAREN tuple RPAREN
+    { TagTuple ($2, $4) }
 | IF exp THEN exp ELSE exp
     { If($2, $4, $6) }
 | IDENT BIND exp

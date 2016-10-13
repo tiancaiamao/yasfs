@@ -13,7 +13,7 @@
 .mly.mli:
 	ocamlyacc $(OFLAGS) $(INCLUDES) $<
 
-OBJS = ast.cmo global.cmo lambda.cmo type.cmo instruct.cmo lexer.cmo parser.cmo bruijn.cmo zinc.cmo infer.cmo driver.cmo
+OBJS = type.cmo ast.cmo global.cmo lambda.cmo instruct.cmo lexer.cmo parser.cmo bruijn.cmo zinc.cmo infer.cmo driver.cmo
 
 DEPEND += lexer.ml parser.ml parser.mli
 

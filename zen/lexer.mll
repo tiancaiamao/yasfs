@@ -19,6 +19,8 @@ rule token = parse
     { RBRACE }
 | ','
     { COMMA }
+| '#'
+    { SHARP }
 | ';'
     { SEMICOLON }
 | digit+
