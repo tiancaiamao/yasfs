@@ -4,13 +4,10 @@ let rec subst t0 v t =
   | Type.Int -> Type.Int
   | Type.Bool -> Type.Bool
   | Type.Var s -> if s = v then t else t0
-  | Type.Tuple ts ->
-    Type.Tuple (List.map (fun x -> subst x v t) ts)
+  | Type.Tuple (tag, tuple) ->
+    Type.Tuple (tag, (List.map (fun x -> subst x v t) tuple))
   | Type.Fun (arg,ret) ->
     Type.Fun (subst arg v t, subst ret v t)
-  | Type.TagTuple ts ->
-    Type.TagTuple (Type.make_tuple_desc ts.tag ts.size
-                  (List.map (fun x -> subst x v t) ts.tuple))
 
 let rec update_type t subst =
   match t with
@@ -19,10 +16,8 @@ let rec update_type t subst =
   | Type.Bool -> Type.Bool
   | Type.Fun (arg,ret) ->
     Type.Fun (update_type arg subst, update_type ret subst)
-  | Type.Tuple ts ->
-    Type.Tuple (List.map (fun x -> update_type x subst) ts)
-  | Type.TagTuple ts ->
-    Type.TagTuple (Type.make_tuple_desc ts.tag ts.size (List.map (fun x -> update_type x subst) ts.tuple))
+  | Type.Tuple (tag, tuple) ->
+    Type.Tuple (tag, (List.map (fun x -> update_type x subst) tuple))
   | Type.Var v -> try List.assoc v subst with _ -> t
 
 let extend_subst s v t =
@@ -33,10 +28,8 @@ let rec occur v t =
   | Type.Var v1 -> v = v1
   | Type.Fun (arg,ret) ->
     (occur v arg) || (occur v ret)
-  | Type.Tuple ts ->
+  | Type.Tuple (tag, ts) ->
     List.exists (occur v) ts
-  | Type.TagTuple ts ->
-    List.exists (occur v) ts.tuple
   | _ -> false
 
 (* 'a M -> ('a -> 'b M) -> 'b M *)
@@ -61,7 +54,7 @@ let rec unifier t1 t2 s =
     (Some s)
     >>= (unifier a1 a2)
     >>= (unifier e1 e2)
-  | (Type.Tuple t1s, Type.Tuple t2s) ->
+  | (Type.Tuple (tag1, t1s), Type.Tuple (tag2, t2s)) when tag1 = tag2 ->
     unifier_list t1s t2s s
   | _ -> None
 and unifier_list t1s t2s s =
@@ -125,17 +118,18 @@ let rec type_of exp env subst =
       | x::xs -> let tv = gen_var () in
         let (ty, subst1, env) = type_of (Ast.Fun (xs, body)) (env_extend env x tv) subst in
         (Type.Fun (tv, ty), subst1, env))
-  | Ast.Tuple vs ->
+  | Ast.Tuple (tag, vs) ->
     let ts = List.map (fun v -> let (t, s, e) = (type_of v env subst) in t) vs in
-    (Type.Tuple ts, subst, env)
-  | Ast.TagTuple (str, vs) ->
-    let ts = List.map (fun v -> let (t, s, e) = (type_of v env subst) in t) vs in
-    (match Global.get_t_env str with
-    | None -> (Type.TagTuple (Global.add_t_env str ts), subst, env)
-    | Some x ->
-      if Type.check_size (List.length ts) x.size
-      then (Type.TagTuple x, subst, env)
-      else failwith "tag tuple size fail")
+    (Type.Tuple (Type.TNone, ts), subst, env)
+
+  (* | Ast.TagTuple (str, vs) -> *)
+  (*   let ts = List.map (fun v -> let (t, s, e) = (type_of v env subst) in t) vs in *)
+  (*   (match Global.get_t_env str with *)
+  (*   | None -> (Type.TagTuple (Global.add_t_env str ts), subst, env) *)
+  (*   | Some x -> *)
+  (*     if Type.check_size (List.length ts) x.size *)
+  (*     then (Type.TagTuple x, subst, env) *)
+  (*     else failwith "tag tuple size fail") *)
 
   (* | Ast.Switch (v, tn, cases) -> *)
   (*   let (tv, subst1, env) = type_of v env subst in *)

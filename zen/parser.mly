@@ -95,14 +95,14 @@ exp:
     { Mul($1, $3) }
 | exp EQUAL exp
     { Equal($1, $3) }
-| LPAREN tuple RPAREN
-    { Tuple $2 }
 | SHARP IDENT LPAREN RPAREN
-    { TagTuple ($2, []) }
+    { Tuple (Some $2, []) }
 | SHARP IDENT LPAREN exp RPAREN
-    { TagTuple ($2, [$4]) }
+    { Tuple (Some $2, [$4]) }
 | SHARP IDENT LPAREN tuple RPAREN
-    { TagTuple ($2, $4) }
+    { Tuple (Some $2, $4) }
+| SHARP LPAREN tuple RPAREN
+    { Tuple (None, $3) }
 | IF exp THEN exp ELSE exp
     { If($2, $4, $6) }
 | IDENT BIND exp

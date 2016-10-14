@@ -3,8 +3,7 @@ type t =
   | Bool of bool
   | Union of int * t
   | Var of int
-  | Tuple of t list
-  | TagTuple of int * t list
+  | Tuple of int * t list
   | App of t * t list
   | Fun of int * t list
   | Fun1 of int * t list

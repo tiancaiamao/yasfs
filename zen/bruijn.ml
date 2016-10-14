@@ -17,33 +17,34 @@ let (empty_env : string list) = []
 let rec ast2lambda env ast = match ast with
   | Ast.Bool v -> Lambda.Bool v
   | Ast.Int v -> Lambda.Int v
-  | Ast.Tuple vs -> Lambda.Tuple (List.map (ast2lambda env) vs)
   | Ast.App (t, ts) -> Lambda.App (ast2lambda env t, List.map (ast2lambda env) ts)
   | Ast.Fun (ts, t) ->
     Lambda.Fun (List.length ts,
-        let e = extend_env env ts in
-          List.map (ast2lambda e) t)
+                let e = extend_env env ts in
+                List.map (ast2lambda e) t)
   | Ast.Fun1 (ts, t) ->
     Lambda.Fun1 (List.length ts,
-        let e = extend_env env ts in
-          List.map (ast2lambda e) t)
+                 let e = extend_env env ts in
+                 List.map (ast2lambda e) t)
   | Ast.Var s -> (match find_env env s with
-    | Some i -> Lambda.Var i
-    | None -> failwith "cannot handle free variable")
+      | Some i -> Lambda.Var i
+      | None -> failwith "cannot handle free variable")
   | Ast.Plus (t1, t2) -> Lambda.Plus (
-    (ast2lambda env t1), (ast2lambda env t2))
+      (ast2lambda env t1), (ast2lambda env t2))
   | Ast.Sub (t1, t2) -> Lambda.Sub (
-    (ast2lambda env t1), (ast2lambda env t2))
+      (ast2lambda env t1), (ast2lambda env t2))
   | Ast.Mul (t1, t2) -> Lambda.Mul (
-    (ast2lambda env t1), (ast2lambda env t2))
+      (ast2lambda env t1), (ast2lambda env t2))
   | Ast.Equal (t1, t2) -> Lambda.Equal (
-    (ast2lambda env t1), (ast2lambda env t2))
+      (ast2lambda env t1), (ast2lambda env t2))
   | Ast.Bind (n, t) -> ast2lambda (extend_env env [n]) t
   | Ast.If (test, succ, fail) -> Lambda.If (
-    (ast2lambda env test), (ast2lambda env succ), (ast2lambda env fail))
-  | Ast.TagTuple (str, ts) ->
-    let x = Hashtbl.find Global.g_t_env str in
-    Lambda.TagTuple (x.tag, (List.map (ast2lambda env) ts))
+      (ast2lambda env test), (ast2lambda env succ), (ast2lambda env fail))
+  | Ast.Tuple (tag, ts) ->
+    let tag1 = (match tag with
+        | Some str -> 42 (* Hashtbl.find Global.g_t_env str *)
+        | None -> 0)
+    in Lambda.Tuple (tag1, (List.map (ast2lambda env) ts))
 
 (*   | Ast.Switch (n, tn, cs) -> *)
 (*     let ty = Hashtbl.find Global.g_t_env tn in *)

@@ -6,7 +6,7 @@ let repeat n v =
 let rec compile exp code = match exp with
     Lambda.Int v -> (Instruct.Const v)::code
   | Lambda.Bool v -> (Instruct.Bool v)::code
-  | Lambda.Tuple vs -> let n = (List.length vs) in
+  | Lambda.Tuple (_, vs) -> let n = (List.length vs) in
     (List.flatten (List.map (fun x -> compile x []) vs)) @ (Instruct.MakeTuple n)::code
   | Lambda.Union (tag, e) -> (compile e []) @ (Instruct.MakeUnion tag)::code
   | Lambda.Var n -> (Instruct.Access n)::code
@@ -43,7 +43,7 @@ and compile_tail exp = match exp with
     Lambda.Int v -> [Instruct.Const v]
   | Lambda.Bool v -> [Instruct.Bool v]
   | Lambda.Prim s -> [Instruct.Prim s]
-  | Lambda.Tuple vs -> let n = (List.length vs) in
+  | Lambda.Tuple (_, vs) -> let n = (List.length vs) in
     (List.flatten (List.map (fun x -> compile x []) vs)) @
     [Instruct.MakeTuple n; Instruct.Return]
   | Lambda.Union (tag, e) -> (compile e []) @
@@ -120,7 +120,7 @@ let step (c, e, s, r) op =
         | Value y -> Stack.push (Value (x*y)) s;
           (c, e, s, r)
         | _ -> failwith "can add non int")
-    | _ -> failwith "can add non int")
+    | _ -> failwith "an add non int")
   | Instruct.Equal -> (match Stack.pop s with
     | Value x -> (match Stack.pop s with
         | Value y -> Stack.push (Bool (if x=y then true else false)) s;

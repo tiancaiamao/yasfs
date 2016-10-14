@@ -235,9 +235,20 @@ tagged tuple?
 ? -> ? -> #CONS
 fn cons (x, y) { #CONS(x, y) }
 fn null () { #NULL() }
-fn car (x) { field 1 x }
+
+car :: (?) -> ?
+fn car (x) { field 0 x }
+
+some :: ? -> #SOME(?)
 fn some (x) { #SOME(x) }
 fn unit (x) { #UNIT(X) }
+
+能否推出x是 tuple 长度大于1 第一项是42 ?
+car被具体化为 (?) -> int
+x被具体化为 (int)
+if car x = 42 
+x :: (int)
+if field 1 x = 42
 
 (tagged tuple len>=2, ?) -> ?
 fn cdr (x) { field 1 x }
@@ -257,3 +268,4 @@ fn length (ls, sum) {
 fn tree_node (x, y) { #TreeNode(x, y) }
 fn leaf (x) { #Leaf(x) }
 
+tuple其实是tag tuple的特例嘛，那么只需要后者足已。
