@@ -18,6 +18,7 @@
 %token PLUS
 %token MUL
 %token SUB
+%token FIELD
 %token TRUE
 %token FALSE
 %token FN
@@ -95,6 +96,8 @@ exp:
     { Mul($1, $3) }
 | exp EQUAL exp
     { Equal($1, $3) }
+| FIELD INT exp
+    { Field($2, $3) }
 | SHARP IDENT LPAREN RPAREN
     { Tuple (Some $2, []) }
 | SHARP IDENT LPAREN exp RPAREN

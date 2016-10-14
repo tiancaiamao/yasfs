@@ -5,5 +5,5 @@ type t =
   | Bool
   | Unit
   | Fun of t * t
-  | Tuple of tag * t list
+  | Tuple of tag * (int * t) list
   | Var of char

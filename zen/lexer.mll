@@ -63,6 +63,8 @@ rule token = parse
     { SWITCH }
 | "case"
     { CASE }
+| "field"
+    { FIELD }
 | ':'
     { COLON }
 | ":="
