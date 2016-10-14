@@ -9,10 +9,10 @@ driver.cmo : zinc.cmo parser.cmi lexer.cmo instruct.cmo infer.cmo bruijn.cmo
 driver.cmx : zinc.cmx parser.cmx lexer.cmx instruct.cmx infer.cmx bruijn.cmx
 driver_test.cmo : zinc.cmo driver.cmo
 driver_test.cmx : zinc.cmx driver.cmx
-global.cmo : type.cmo
-global.cmx : type.cmx
-infer.cmo : type.cmo ast.cmo
-infer.cmx : type.cmx ast.cmx
+global.cmo :
+global.cmx :
+infer.cmo : type.cmo global.cmo ast.cmo
+infer.cmx : type.cmx global.cmx ast.cmx
 infer_test.cmo : parser.cmi lexer.cmo infer.cmo
 infer_test.cmx : parser.cmx lexer.cmx infer.cmx
 instruct.cmo :

@@ -1,4 +1,4 @@
-type tag = TNone | TOneof of int list | TExact of int
+type tag = TAny | TOneof of int list | TExact of int | TNone
 
 type t =
     Int

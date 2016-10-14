@@ -52,6 +52,8 @@ let rec list_union l1 l2 getkey =
 
 let tag_equal x y =
   match (x, y) with
+  | (Type.TAny, _) -> true
+  | (_, Type.TAny) -> true
   | (Type.TNone, Type.TNone) -> true
   | (Type.TExact a, Type.TExact b) -> a=b
   | (Type.TExact a, Type.TOneof l) -> List.mem a l
@@ -139,7 +141,7 @@ let rec type_of exp env subst =
   | Ast.Field (i,e) ->
     let result_type = gen_var () in
     let (te, subst1, env) = (type_of e env subst) in
-    let subst2 = (subst1 >>= (unifier te (Type.Tuple (Type.TNone, [(i, result_type)])))) in
+    let subst2 = (subst1 >>= (unifier te (Type.Tuple (Type.TAny, [(i, result_type)])))) in
     (result_type, subst2, env)
   | Ast.If (a,b,c) ->
     let (ta, subst1, env) = type_of a env subst in
@@ -157,15 +159,21 @@ let rec type_of exp env subst =
       | x::xs -> let tv = gen_var () in
         let (ty, subst1, env) = type_of (Ast.Fun (xs, body)) (env_extend env x tv) subst in
         (Type.Fun (tv, ty), subst1, env))
-  | Ast.Tuple (tag, vs) ->
+  | Ast.Tuple (name, vs) ->
     let ts = List.mapi (fun i v -> let (t, s, e) = (type_of v env subst) in (i, t)) vs in
-    (Type.Tuple (Type.TNone, ts), subst, env)
-
-  (* | Ast.Switch (v, tn, cases) -> *)
-  (*   let (tv, subst1, env) = type_of v env subst in *)
-  (*   let ty = Hashtbl.find Global.g_t_env tn in *)
-  (*   let subst2 = subst >>= unifier tv ty in *)
-  (*   (ty, subst2, env) *)
+    let tag = match name with Some str -> Global.name2tag str | None -> 0 in
+    (Type.Tuple (Type.TExact tag, ts), subst, env)
+  | Ast.Switch (v, cases) ->
+    let ret = gen_var () in
+    let tags = List.map (function (x,_) -> Global.name2tag x) cases in
+    let ty = (Type.Tuple (Type.TOneof tags, [])) in
+    let (t, subst1, e) = (type_of v env subst) in
+    let subst2 = (subst1 >>= (unifier t ty)) in
+    let es = List.map (function (_,y) -> y) cases in
+    let subst3 = (List.fold_left (fun s e ->
+        let (t,s1,env1) = (type_of e env s) in
+        s1 >>= unifier t ret) subst2 es) in
+    (ret, subst3, env)
   | Ast.Fun1 (vars, body) ->
     let (t, subst1, env) = type_of (Ast.Fun (vars, body)) env subst in
     (match t with
