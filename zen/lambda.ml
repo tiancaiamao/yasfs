@@ -12,6 +12,7 @@ type t =
   | Plus of t * t
   | Mul of t * t
   | Sub of t * t
+  | Field of int * t
   | Equal of t * t
   | Prim of string
   | Switch of t * case list

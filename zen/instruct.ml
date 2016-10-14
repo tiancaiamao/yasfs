@@ -20,3 +20,4 @@ type t =
   | Mul
   | Sub
   | Equal
+  | Field of int

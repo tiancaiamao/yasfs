@@ -37,6 +37,8 @@ let rec compile exp code = match exp with
     compile a (compile b (Instruct.Sub::code))
   | Lambda.Mul (a, b) ->
     compile a (compile b (Instruct.Mul::code))
+  | Lambda.Field (n, b) ->
+    compile b ((Instruct.Field n)::code)
   | Lambda.Equal (a, b) ->
     compile a (compile b (Instruct.Equal::code))
 and compile_tail exp = match exp with
@@ -55,6 +57,7 @@ and compile_tail exp = match exp with
   | Lambda.Sub _ -> compile exp [Instruct.Return]
   | Lambda.Mul _ -> compile exp [Instruct.Return]
   | Lambda.Equal _ -> compile exp [Instruct.Return]
+  | Lambda.Field _ -> compile exp [Instruct.Return]
   | Lambda.If _ -> compile exp [Instruct.Return]
   | Lambda.Fun (n,ts) -> (match ts with
     | [t] -> (match n with
@@ -101,6 +104,10 @@ let step (c, e, s, r) op =
     in loop 0 n []
   | Instruct.MakeUnion tag ->
     Stack.push (Union (tag, (Stack.pop s))) s; (c, e, s, r)
+  | Instruct.Field n ->
+    (match (Stack.pop s) with
+    | Tuple ls -> (Stack.push (List.nth ls n) s); (c, e, s, r)
+    | _ -> failwith "type infer should kill this case")
   | Instruct.Pop -> Stack.pop s |> ignore; (c, e, s, r)
   | Instruct.Copy -> Stack.push (Stack.top s) s |> ignore; (c, e, s, r)
   | Instruct.Plus -> (match Stack.pop s with
