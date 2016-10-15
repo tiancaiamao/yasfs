@@ -46,13 +46,27 @@ let rec list_equal l1 l2 =
   | [] -> (List.length l2) = 0
   | x::xs -> (List.mem x l2) && list_equal xs (List.filter (fun v -> v <> x) l2)
 
-let rec list_intersection l1 l2 getkey =
+let rec list_intersection l1 l2 =
   match l1 with
   | [] -> []
-  | x::xs ->
-    try let y = List.find (fun v -> (getkey v) = (getkey x)) l2 in
-      (x, y) :: (list_intersection xs l2 getkey) with
-    _ -> list_intersection xs l2 getkey
+  | (i,x)::xs ->
+    try let y = List.assq i l2 in
+      (i,x,y) :: (list_intersection xs l2) with
+      _ -> list_intersection xs l2
+
+let rec list_union l1 l2 =
+  match l1 with
+  | [] -> l2
+  | (i,x)::xs -> if List.mem_assq i l2
+    then list_union xs l2
+    else (i,x)::(list_union xs l2)
+
+let rec list_sub l1 l2 res =
+  match l1 with
+  | [] -> res
+  | (i, x)::xs -> if List.mem_assq i l2
+    then list_sub xs l2 res
+    else list_sub xs l2 ((i,x)::res)
 
 let tag_equal x y =
   match (x, y) with
@@ -64,6 +78,8 @@ let tag_equal x y =
   | (Type.TOneof l, Type.TExact a) -> List.mem a l
   | (Type.TOneof l1, Type.TOneof l2) -> list_equal l1 l2
   | _ -> false
+
+let is_some = function Some _ -> true | _ -> false
 
 (* (unifier t1 t2) : ('a -> 'b M) *)
 let rec unifier t1 t2 s =
@@ -83,18 +99,21 @@ let rec unifier t1 t2 s =
     >>= (unifier a1 a2)
     >>= (unifier e1 e2)
   | (Type.Tuple td1, Type.Tuple td2) when tag_equal td1.tag td2.tag ->
-    unifier_tuple_list td1.tuple td2.tuple s
+    let common = list_intersection td1.tuple td2.tuple in
+    let ls1 = List.map (function (i,x,y) -> x) common in
+    let ls2 = List.map (function (i,x,y) -> y) common in
+    let subst1 =  unifier_list ls1 ls2 s in
+    if is_some subst1 then
+      (td1.tuple <- (td1.tuple @ (list_sub td2.tuple td1.tuple []));
+       td2.tuple <- (td2.tuple @ (list_sub td1.tuple td2.tuple []));
+       subst1)
+    else None
   | _ -> None
-and unifier_tuple_list t1s t2s s =
-  let common = list_intersection t1s t2s (function (x,y) -> x) in
-  let ls1 = List.map (function ((_,x),(_,y)) -> x) common in
-  let ls2 = List.map (function ((_,x),(_,y)) -> y) common in
-  unifier_list ls1 ls2 s
 and unifier_list t1s t2s s =
-  match (t1s,t2s) with
-  | ([],[]) -> Some s
-  | (x::xs, y::ys) -> (unifier x y s) >>= (unifier_list xs ys)
-  | _ -> None
+    match (t1s,t2s) with
+    | ([],[]) -> Some s
+    | (x::xs, y::ys) -> (unifier x y s) >>= (unifier_list xs ys)
+    | _ -> None
 
 let env_lookup env n = List.assoc n env
 
@@ -183,8 +202,8 @@ let rec type_of exp env subst =
   | Ast.Fun1 (vars, body) ->
     let (t, subst1, env) = type_of (Ast.Fun (vars, body)) env subst in
     (match t with
-    | Type.Fun (self, _) -> (self, subst1, env)
-    | _ -> failwith "Ast.fun1 fail")
+     | Type.Fun (self, _) -> (self, subst1, env)
+     | _ -> failwith "Ast.fun1 fail")
   | Ast.App (rator,rands) -> type_of_app rator (List.rev rands) env subst
 and type_of_body ls env subst =
   match ls with
