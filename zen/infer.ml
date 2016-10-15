@@ -4,8 +4,10 @@ let rec subst t0 v t =
   | Type.Int -> Type.Int
   | Type.Bool -> Type.Bool
   | Type.Var s -> if s = v then t else t0
-  | Type.Tuple (tag, tuple) ->
-    Type.Tuple (tag, (List.map (fun (i,x) -> (i, (subst x v t))) tuple))
+  | Type.Tuple td ->
+    let tuple = (List.map (fun (i,x) -> (i, (subst x v t))) td.tuple) in
+    td.tuple <- tuple;
+    t0
   | Type.Fun (arg,ret) ->
     Type.Fun (subst arg v t, subst ret v t)
 
@@ -16,8 +18,10 @@ let rec update_type t subst =
   | Type.Bool -> Type.Bool
   | Type.Fun (arg,ret) ->
     Type.Fun (update_type arg subst, update_type ret subst)
-  | Type.Tuple (tag, tuple) ->
-    Type.Tuple (tag, (List.map (fun (i,x) -> (i, (update_type x subst))) tuple))
+  | Type.Tuple td ->
+    let tuple = (List.map (fun (i,x) -> (i, (update_type x subst))) td.tuple) in
+    td.tuple <- tuple;
+    t
   | Type.Var v -> try List.assoc v subst with _ -> t
 
 let extend_subst s v t =
@@ -28,8 +32,8 @@ let rec occur v t =
   | Type.Var v1 -> v = v1
   | Type.Fun (arg,ret) ->
     (occur v arg) || (occur v ret)
-  | Type.Tuple (tag, ts) ->
-    List.exists (occur v) (List.map (fun (i,v) -> v) ts)
+  | Type.Tuple td ->
+    List.exists (occur v) (List.map (fun (i,v) -> v) td.tuple)
   | _ -> false
 
 (* 'a M -> ('a -> 'b M) -> 'b M *)
@@ -42,13 +46,13 @@ let rec list_equal l1 l2 =
   | [] -> (List.length l2) = 0
   | x::xs -> (List.mem x l2) && list_equal xs (List.filter (fun v -> v <> x) l2)
 
-let rec list_union l1 l2 getkey =
+let rec list_intersection l1 l2 getkey =
   match l1 with
   | [] -> []
   | x::xs ->
     try let y = List.find (fun v -> (getkey v) = (getkey x)) l2 in
-      (x, y) :: (list_union xs l2 getkey) with
-    _ -> list_union xs l2 getkey
+      (x, y) :: (list_intersection xs l2 getkey) with
+    _ -> list_intersection xs l2 getkey
 
 let tag_equal x y =
   match (x, y) with
@@ -78,11 +82,11 @@ let rec unifier t1 t2 s =
     (Some s)
     >>= (unifier a1 a2)
     >>= (unifier e1 e2)
-  | (Type.Tuple (tag1, t1s), Type.Tuple (tag2, t2s)) when tag_equal tag1 tag2 ->
-    unifier_tuple_list t1s t2s s
+  | (Type.Tuple td1, Type.Tuple td2) when tag_equal td1.tag td2.tag ->
+    unifier_tuple_list td1.tuple td2.tuple s
   | _ -> None
 and unifier_tuple_list t1s t2s s =
-  let common = list_union t1s t2s (function (x,y) -> x) in
+  let common = list_intersection t1s t2s (function (x,y) -> x) in
   let ls1 = List.map (function ((_,x),(_,y)) -> x) common in
   let ls2 = List.map (function ((_,x),(_,y)) -> y) common in
   unifier_list ls1 ls2 s
@@ -141,7 +145,8 @@ let rec type_of exp env subst =
   | Ast.Field (i,e) ->
     let result_type = gen_var () in
     let (te, subst1, env) = (type_of e env subst) in
-    let subst2 = (subst1 >>= (unifier te (Type.Tuple (Type.TAny, [(i, result_type)])))) in
+    let should_be = Type.Tuple (Type.make_tuple_desc Type.TAny [(i, result_type)]) in
+    let subst2 = (subst1 >>= (unifier te should_be)) in
     (result_type, subst2, env)
   | Ast.If (a,b,c) ->
     let (ta, subst1, env) = type_of a env subst in
@@ -162,11 +167,12 @@ let rec type_of exp env subst =
   | Ast.Tuple (name, vs) ->
     let ts = List.mapi (fun i v -> let (t, s, e) = (type_of v env subst) in (i, t)) vs in
     let tag = match name with Some str -> Global.name2tag str | None -> 0 in
-    (Type.Tuple (Type.TExact tag, ts), subst, env)
+    let td = Type.make_tuple_desc (Type.TExact tag) ts in
+    (Type.Tuple td, subst, env)
   | Ast.Switch (v, cases) ->
     let ret = gen_var () in
     let tags = List.map (function (x,_) -> Global.name2tag x) cases in
-    let ty = (Type.Tuple (Type.TOneof tags, [])) in
+    let ty = (Type.Tuple (Type.make_tuple_desc (Type.TOneof tags) [])) in
     let (t, subst1, e) = (type_of v env subst) in
     let subst2 = (subst1 >>= (unifier t ty)) in
     let es = List.map (function (_,y) -> y) cases in
