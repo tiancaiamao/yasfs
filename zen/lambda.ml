@@ -1,7 +1,6 @@
 type t =
     Int of int
   | Bool of bool
-  | Union of int * t
   | Var of int
   | Tuple of int * t list
   | App of t * t list
@@ -15,5 +14,4 @@ type t =
   | Field of int * t
   | Equal of t * t
   | Prim of string
-  | Switch of t * case list
-and case = int * t
+  | Switch of t * (int * t) list

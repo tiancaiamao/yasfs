@@ -41,18 +41,11 @@ let rec ast2lambda env ast = match ast with
   | Ast.Bind (n, t) -> ast2lambda (extend_env env [n]) t
   | Ast.If (test, succ, fail) -> Lambda.If (
       (ast2lambda env test), (ast2lambda env succ), (ast2lambda env fail))
-  | Ast.Tuple (tag, ts) ->
-    let tag1 = (match tag with
-        | Some str -> 42 (* Hashtbl.find Global.g_t_env str *)
-        | None -> 0)
-    in Lambda.Tuple (tag1, (List.map (ast2lambda env) ts))
-
-(*   | Ast.Switch (n, tn, cs) -> *)
-(*     let ty = Hashtbl.find Global.g_t_env tn in *)
-(*     let tag = Lambda.App (Lambda.Prim "tag", [ast2lambda env n]) in *)
-(*     let body = (List.map (fun (n,t) -> case2lambda (Type.Field n) t ty env) cs) in *)
-(*     Lambda.Switch (tag, body) *)
-(* and case2lambda field term ty env = *)
-(*     let idx = field2index field ty in *)
-(*     let lam = ast2lambda env term in *)
-(*     (idx, lam) *)
+  | Ast.Tuple (name, ts) ->
+    let tag = match name with
+      | Some str -> Global.name2tag str
+      | None -> 0
+    in Lambda.Tuple (tag, (List.map (ast2lambda env) ts))
+  | Ast.Switch (t, cs) ->
+    let body = List.map (fun (n, v) -> (Global.name2tag n, (ast2lambda env v))) cs in
+    Lambda.Switch (ast2lambda env t, body)

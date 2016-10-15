@@ -6,9 +6,9 @@ let repeat n v =
 let rec compile exp code = match exp with
     Lambda.Int v -> (Instruct.Const v)::code
   | Lambda.Bool v -> (Instruct.Bool v)::code
-  | Lambda.Tuple (_, vs) -> let n = (List.length vs) in
-    (List.flatten (List.map (fun x -> compile x []) vs)) @ (Instruct.MakeTuple n)::code
-  | Lambda.Union (tag, e) -> (compile e []) @ (Instruct.MakeUnion tag)::code
+  | Lambda.Tuple (tag, vs) -> let n = (List.length vs) in
+    (List.flatten (List.map (fun x -> compile x []) vs)) @
+    (Instruct.MakeTuple (tag,n))::code
   | Lambda.Var n -> (Instruct.Access n)::code
   | Lambda.Bind t -> compile t (Instruct.Bind::code)
   | Lambda.Fun (n,ts) ->
@@ -23,13 +23,8 @@ let rec compile exp code = match exp with
   | Lambda.If (t, succ, fail) ->
     compile t [Instruct.Branch ((compile succ code), (compile fail code))]
   | Lambda.Switch (t, cases) ->
-    let rec handle cases code =
-      match cases with
-      | [] -> code
-      | (ith, case)::xs ->
-      [Instruct.Copy; (Instruct.Const ith); Instruct.Equal;
-       (Instruct.Branch ((compile case code), (handle xs code)))] in
-    compile t (handle cases code)
+    compile t [Instruct.Switch
+                 (List.map (fun (i, x) -> (i, (compile x code))) cases)]
   | Lambda.Prim s -> (Instruct.Prim s)::code
   | Lambda.Plus (a, b) ->
     compile a (compile b (Instruct.Plus::code))
@@ -45,14 +40,10 @@ and compile_tail exp = match exp with
     Lambda.Int v -> [Instruct.Const v]
   | Lambda.Bool v -> [Instruct.Bool v]
   | Lambda.Prim s -> [Instruct.Prim s]
-  | Lambda.Tuple (_, vs) -> let n = (List.length vs) in
-    (List.flatten (List.map (fun x -> compile x []) vs)) @
-    [Instruct.MakeTuple n; Instruct.Return]
-  | Lambda.Union (tag, e) -> (compile e []) @
-    [Instruct.MakeTuple tag; Instruct.Return]
   | Lambda.Var n -> [Instruct.Access n; Instruct.Return]
   | Lambda.Bind t -> [Instruct.Bind]
   | Lambda.Switch _ -> compile exp [Instruct.Return]
+  | Lambda.Tuple _ -> compile exp [Instruct.Return]
   | Lambda.Plus _ -> compile exp [Instruct.Return]
   | Lambda.Sub _ -> compile exp [Instruct.Return]
   | Lambda.Mul _ -> compile exp [Instruct.Return]
@@ -82,8 +73,7 @@ and compile_body ts = match ts with
 type result =
     Value of int
   | Bool of bool
-  | Tuple of result list
-  | Union of int * result
+  | Tuple of int * result list
   | Prim of string
   | Lambda of (Instruct.t list * result list)
   | Eplison
@@ -97,16 +87,14 @@ let step (c, e, s, r) op =
   Instruct.Bool v -> Stack.push (Bool v) s; (c, e, s, r)
   | Instruct.Const v -> Stack.push (Value v) s; (c, e, s, r)
   | Instruct.Prim str -> Stack.push (Prim str) s; (c, e, s, r)
-  | Instruct.MakeTuple n ->
+  | Instruct.MakeTuple (tag, n) ->
     let rec loop i n res =
-      if i=n then begin Stack.push (Tuple res) s; (c, e, s, r) end
+      if i=n then begin Stack.push (Tuple (tag, res)) s; (c, e, s, r) end
       else loop (i+1) n ((Stack.pop s)::res)
     in loop 0 n []
-  | Instruct.MakeUnion tag ->
-    Stack.push (Union (tag, (Stack.pop s))) s; (c, e, s, r)
   | Instruct.Field n ->
     (match (Stack.pop s) with
-    | Tuple ls -> (Stack.push (List.nth ls n) s); (c, e, s, r)
+    | Tuple (tag, ls) -> (Stack.push (List.nth ls n) s); (c, e, s, r)
     | _ -> failwith "type infer should kill this case")
   | Instruct.Pop -> Stack.pop s |> ignore; (c, e, s, r)
   | Instruct.Copy -> Stack.push (Stack.top s) s |> ignore; (c, e, s, r)
@@ -152,12 +140,6 @@ let step (c, e, s, r) op =
      | Lambda (c1, e1) ->
        Stack.push (Lambda (c,e)) r;
        (c1, e1, s, r)
-     | Prim str -> if str = "tag" then
-         (Stack.pop s |> ignore;
-         match Stack.top s with
-          | Union (tag, res) -> Stack.push (Value tag) s; (c, e, s, r)
-          | _ -> assert false)
-       else assert false
      | _ -> failwith "cannot apply non closure")
   | Instruct.Pushmark -> Stack.push Eplison s; (c, e, s, r)
   | Instruct.Grab ->
@@ -181,6 +163,12 @@ let step (c, e, s, r) op =
     else match v with
         Lambda (c1,e1) -> (c1, e1, s, r)
       | _ -> failwith "should be")
+  | Instruct.Switch cases ->
+    (match Stack.pop s with
+    | Tuple (tag,_) ->
+      let code = List.assq tag cases in
+      (code, e, s, r)
+    | _ -> failwith "switch should get tuple!")
   | _ -> failwith "not implement"
 
 let run code e s r =

@@ -1,8 +1,7 @@
 type t =
     Const of int
   | Bool of bool
-  | MakeTuple of int
-  | MakeUnion of int
+  | MakeTuple of int * int
   | Prim of string
   | Access of int
   | Closure of t list
@@ -21,3 +20,4 @@ type t =
   | Sub
   | Equal
   | Field of int
+  | Switch of (int * t list) list
