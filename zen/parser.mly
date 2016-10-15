@@ -70,6 +70,14 @@ simple_exp:
     { Bool(true) }
 | FALSE
     { Bool(false) }
+| SHARP IDENT LPAREN RPAREN
+    { Tuple (Some $2, []) }
+| SHARP IDENT LPAREN exp RPAREN
+    { Tuple (Some $2, [$4]) }
+| SHARP IDENT LPAREN tuple RPAREN
+    { Tuple (Some $2, $4) }
+| SHARP LPAREN tuple RPAREN
+    { Tuple (None, $3) }
 
 case_list:
 | CASE IDENT COLON exp
@@ -98,14 +106,6 @@ exp:
     { Equal($1, $3) }
 | FIELD INT exp
     { Field($2, $3) }
-| SHARP IDENT LPAREN RPAREN
-    { Tuple (Some $2, []) }
-| SHARP IDENT LPAREN exp RPAREN
-    { Tuple (Some $2, [$4]) }
-| SHARP IDENT LPAREN tuple RPAREN
-    { Tuple (Some $2, $4) }
-| SHARP LPAREN tuple RPAREN
-    { Tuple (None, $3) }
 | IF exp THEN exp ELSE exp
     { If($2, $4, $6) }
 | IDENT BIND exp
