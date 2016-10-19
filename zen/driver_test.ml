@@ -39,6 +39,9 @@ let test_bool () =
 let test_if_then_else () =
   (eval "if 1=1 then 5 else 2") = (Value 5)
 
+let test_closure () =
+  (eval "(fn x -> (fn y -> x+y)) 1 2") = (Value 3)
+
 let tests = [
   ("identity", test_identity);
   ("multi_argument", test_multi_argument);
@@ -50,6 +53,7 @@ let tests = [
   ("test_if_then_else", test_if_then_else);
   ("test_sum100", test_sum100);
   ("factorial", test_factorial);
+  ("test_closure", test_closure);
 ]
 
 

@@ -269,3 +269,23 @@ fn tree_node (x, y) { #TreeNode(x, y) }
 fn leaf (x) { #Leaf(x) }
 
 tuple其实是tag tuple的特例嘛，那么只需要后者足已。
+
+## FFI
+
+参考lua，不可以让C引用到虚拟机里面的任何对象！
+
+语言的对象只能在语言中访问。C中想访问，只是拷贝一份，修改，再弄回去。
+
+这样的原因是，一旦暴露类似没有Value类型的东西给C，C就有可能将它存储起来。
+而虚拟机那边的GC并不知道对象在外部系统中被引用，可能删除该对象，在C那边就会出现悬挂引用
+
+```
+value bar(value list) {
+    CAMLparam l(list);
+    CAMLlocal l(temp);
+    temp = alloc_tuple(2); // 这里的alloc可能触发GC，如果没有前面保护list的动作，list可能已经被释放
+    CAMLreturn (Val_unit);
+} 
+```
+
+通过一个栈交互
