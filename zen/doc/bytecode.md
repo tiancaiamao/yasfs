@@ -5,29 +5,27 @@ int是32位或者64位，由机器字长决定
 pc
 bp
 sp
-accu
+acc
 env
 global
 
-
 ## 指令集
 
+CLOSURE ofst 创建闭包，pc为下一个，环境为空
+APPLY 将pc和env设置为acc(闭包)里面的值
+ENV n 将参数数量进栈，更新bp，保存bp
+UNENV 跟ENV相反的操作
+RETURN n 出栈n个元素，将pc和env设置为acc里面的值
+MARK  标记设置为sp
+ACC n 栈顶往下第n个到acc
 
 ACC0 栈顶到acc
-ACC n 栈顶往下第n个到acc
 PUSH0 acc到栈顶
 PUSHACC n stack[top-n]->acc
 POP n 出栈n个
 ASSIGN n 栈第n个设置为acc，acc设置为unit
 ENVACC n acc设置为env第n个
-PUSHADDR ofst 进栈环境，进栈pc+ofst
-APPLY 将pc和env设置为acc(闭包)里面的值
-RETURN n 出栈n个元素，将pc和env设置为acc里面的值
-GRAB n 如果参数足够(args大于等于n)，直接将args置为0；否则创建闭包(pc-3,环境,栈上其它..)  
 
-GRAB语义是栈到环境
-
-CLOSURE n ofst 将acc以及栈顶往下n个，连同pc+ofst，创建闭包
 OFFSETCLOSURE n 将acc设置为环境中第n个闭包值
 GETGLOBAL n 将accu设置为global数据的第n个
 GETGLOBALFIELD n p global的第n个的第p个field
@@ -61,3 +59,29 @@ GTINT
 GEINT
 OFFSETINT ofst 在accu加上ofst
 STOP
+
+其实"环境"由静态跟动态两个部分组成，动态的那部分保存在栈上面，静态的部分保存在env寄存器里面
+bp跟stack[bp]区间，是动态环境
+
+闭包 = 环境 + pc
+环境 = 动态环境 + 静态环境
+动态环境 = bp跟stack[bp]区间
+
+闭包跟上下文其实等价
+
+函数调用就是保存上下文，切换到新的上下文
+保存上下文跟切换其实是两个动作，保存上下文涉及保存旧的pc,env,bp；切换上下文涉及覆盖当前的pc,env,bp；
+对于尾递归，可以不用保存上下文，直接切换新的上下文
+所以呢，相关的指令是三条：
+PUSHADDR 保存上下文 -- 将bp env pc进栈
+APPLY 切换上下文 -- bp更新为sp、pc和env更新为acc里面的值
+RETURN 返回之前的上下文
+
+闭包的形成有以下几种情况：
+CLOSURE指令：非尾调用的时候lambda会生成闭包
+GRAB指令：当判断参数不够时，会生成闭包
+PUSHADDR指令：返回信息实际上就是闭包
+
+仅有一个bp是不够的，需要加一个mark
+mark不需要保存在栈内(不需要恢复)，但是需要有
+bp还是原始的作用
