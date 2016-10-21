@@ -1,9 +1,7 @@
-package main
+package vm
 
 import (
-	"bytes"
 	"encoding/binary"
-	"fmt"
 	"unsafe"
 
 	"github.com/ngaut/log"
@@ -18,7 +16,6 @@ const (
 	TypeTuple
 	TypeClosure
 	TypeString
-	TypeReturnAddr
 	TypeEnv
 )
 
@@ -33,17 +30,6 @@ type Unit struct {
 type Int struct {
 	Value
 	v int
-}
-
-type ReturnAddr struct {
-	Value
-	v int
-}
-
-func NewReturnAddr(pc int) *Value {
-	tmp := ReturnAddr{v: pc}
-	tmp.ValueType = TypeReturnAddr
-	return &tmp.Value
 }
 
 type Bool struct {
@@ -120,10 +106,6 @@ func (v *Value) Tuple() *Tuple {
 	return (*Tuple)(unsafe.Pointer(v))
 }
 
-func (v *Value) ReturnAddr() *ReturnAddr {
-	return (*ReturnAddr)(unsafe.Pointer(v))
-}
-
 type Env struct {
 	Value
 	data []*Value
@@ -131,26 +113,6 @@ type Env struct {
 
 func (e *Env) Get(n int) *Value {
 	return e.data[n]
-}
-
-type Stack struct {
-	data []*Value
-	top  int
-}
-
-func (s *Stack) PopN(n int) []*Value {
-	ret := s.data[s.top-n : s.top]
-	s.top -= n
-	return ret
-}
-
-func (s *Stack) Push(v *Value) {
-	s.data[s.top] = v
-	s.top++
-}
-
-func (s *Stack) Access(n int) *Value {
-	return s.data[s.top-n]
 }
 
 type ctx struct {
@@ -177,7 +139,7 @@ type VM struct {
 	env   *Env
 	stack []*Value
 
-	ctx
+	ctx ctx
 }
 
 func New() *VM {
@@ -204,6 +166,7 @@ LOOP:
 			v := binary.LittleEndian.Uint32(code[vm.pc+1:])
 			log.Debug("CONST", v)
 			vm.acc = NewInt(int(v))
+			log.Infof("%#v", vm.acc.Int())
 			vm.pc += 5
 		case ConstTrue:
 			vm.acc = NewBool(true)
@@ -247,7 +210,7 @@ LOOP:
 			}
 			log.Debugf("ENV, copy %d stack, save bp %d, set bp to sp %d", len(env.data), vm.bp, vm.sp)
 			vm.ctx.Push(vm.bp) // 保存bp
-			vm.bp = vm.sp
+			vm.bp = vm.sp - 1
 			vm.pc++
 		case UNENV:
 			vm.bp = vm.ctx.Pop()
@@ -262,12 +225,11 @@ LOOP:
 		// 	vm.pc += 4
 		case ACCESS:
 			n := int(code[vm.pc+1])
-			vm.stack[vm.sp] = vm.stack[vm.bp-n]
-			vm.sp++
+			vm.acc = vm.stack[vm.bp-n]
 			vm.pc += 2
-			log.Debugf("ACCESS %d", n)
+			log.Debugf("ACCESS %d get %v", vm.bp-n, vm.acc)
 		case PUSH:
-			log.Debug("PUSH")
+			log.Debugf("PUSH %d %v", vm.sp, vm.acc)
 			vm.stack[vm.sp] = vm.acc
 			vm.sp++
 			vm.pc++
@@ -290,113 +252,4 @@ LOOP:
 		}
 	}
 	return vm.acc
-}
-
-type Emit struct {
-	bytes.Buffer
-}
-
-func (e *Emit) CONST(v int32) {
-	e.WriteByte(CONST)
-	binary.Write(&e.Buffer, binary.LittleEndian, v)
-}
-
-func (e *Emit) PUSH() {
-	e.WriteByte(PUSH)
-}
-
-func (e *Emit) CLOSURE(c []byte) {
-	e.WriteByte(CLOSURE)
-	binary.Write(&e.Buffer, binary.LittleEndian, int32(len(c)))
-	e.Write(c)
-}
-
-func (e *Emit) CHECK(n byte) {
-	e.WriteByte(CHECK)
-	e.WriteByte(n)
-}
-
-func (e *Emit) ACCESS(n byte) {
-	e.WriteByte(ACCESS)
-	e.WriteByte(n)
-}
-
-func (e *Emit) ADDINT() {
-	e.WriteByte(ADDINT)
-}
-
-func (e *Emit) RETURN() {
-	e.WriteByte(RETURN)
-}
-
-func (e *Emit) APPLY() {
-	e.WriteByte(APPLY)
-}
-
-func (e *Emit) STOP() {
-	e.WriteByte(STOP)
-}
-
-func (e *Emit) MARK() {
-	e.WriteByte(MARK)
-}
-
-func (e *Emit) ENV() {
-	e.WriteByte(ENV)
-}
-
-func (e *Emit) UNENV() {
-	e.WriteByte(UNENV)
-}
-
-const (
-	STOP = iota
-	MARK
-	CONST
-	PUSH
-	CLOSURE
-	APPLY
-	CHECK
-	ENV
-	ACCESS
-	ADDINT
-	UNENV
-	RETURN
-	BRANCH
-
-	ConstTrue
-	ConstFalse
-	MakeTuple // + tag + size
-	TailApply
-	JumpIf // + int
-	Goto   // + int
-	Field  // + int
-	Switch // + (tag + offset) * n
-)
-
-func main() {
-	c := &Emit{}
-	c.CHECK(2)
-	c.ENV()
-	c.ACCESS(0)
-	c.PUSH()
-	c.ACCESS(1)
-	c.ADDINT()
-	c.UNENV()
-	c.RETURN()
-
-	d := &Emit{}
-	d.MARK()
-	d.CONST(1)
-	d.PUSH()
-	d.CONST(2)
-	d.PUSH()
-	d.CLOSURE(c.Bytes())
-	d.APPLY()
-	d.STOP()
-
-	fmt.Println("hello wolrd:", d.Bytes())
-	vm := New()
-	vm.Run(d.Bytes())
-	fmt.Println(vm.acc)
 }
