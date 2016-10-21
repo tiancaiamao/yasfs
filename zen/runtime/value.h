@@ -17,4 +17,13 @@ value value_true;
 value value_false;
 value value_unit;
 
+int env_length(value env);
+value env_get(value env, int n);
+
+value new_closure(int pc, value env);
+int closure_pc(value cls);
+
+value value_add(value v1, value v2);
+
+
 #endif
