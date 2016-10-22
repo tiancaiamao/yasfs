@@ -2,10 +2,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 bool
 is_block(value v) {
-  return (v & 1) == 0;
+  return (v & 7) == 0;
 }
 
 bool
@@ -28,13 +29,11 @@ struct block_head {
   uint32_t size;
 };
 
-static struct block_head _const_true;
-static struct block_head _const_false;
-static struct block_head _const_unit;
-
-value value_true = (value)&_const_true;
-value value_false = (value)&_const_false;
-value value_unit = (value)&_const_unit;
+// lowest bit != 1 not int
+// lowest 3 bit != 0 not a valid aligned pointer
+value value_true = (value)0x12; // 18
+value value_false = (value)0x22; // 34
+value value_unit = (value)0x32; // 66
 
 struct Env {
   struct block_head head;
@@ -60,6 +59,32 @@ block_alloc(int count, uint8_t tag) {
   head->tag = tag;
   head->size = count;
   return (value)head;
+}
+
+void
+print_value(value v) {
+  if (is_int(v)) {
+    printf("int: %d\n", (int)(v>>1));
+  } else if (v == value_true) {
+    printf("true\n");
+  } else if (v == value_false) {
+    printf("false\n");
+  } else if (v == value_unit) {
+    printf("unit\n");
+  } else {
+    struct block_head *head = (struct block_head*)v;
+    switch (head->tag) {
+    case tag_tuple:
+      printf("tuple\n");
+      break;
+    case tag_closure:
+      printf("closure\n");
+      break;
+    case tag_string:
+      printf("string\n");
+      break;
+    }
+  }
 }
 
 int

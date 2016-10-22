@@ -53,8 +53,9 @@ let o b id =
 
 let rec emit_inst buf x =
     match x with
-    | Instruct.Const n -> o buf idCONST;o_uint64 buf n
-    | Instruct.Bool n -> o buf idCONST; o_uint64 buf 0x322
+    | Instruct.Const n -> o buf idCONST;o_uint64 buf (n*2+1)
+    | Instruct.Bool n -> o buf idCONST;
+      o_uint64 buf (if n then 18 else 34)
     | Instruct.Stop -> o buf idSTOP
     | Instruct.Apply -> o buf idAPPLY
     | Instruct.Plus -> o buf idADDINT

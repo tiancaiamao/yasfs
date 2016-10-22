@@ -41,7 +41,7 @@ ctx_init(struct Ctx* ctx) {
   ctx->sp = 0;
 }
 
-void
+static void
 vm_init(struct VM* vm, int size) {
   vm->pc = 0;
   vm->sp = 0;
@@ -51,6 +51,13 @@ vm_init(struct VM* vm, int size) {
   vm->env = (value)NULL;
   ctx_init(&vm->ctx);
   return;
+}
+
+struct VM*
+vm_new(int sz) {
+  struct VM *vm = (struct VM*)malloc(sizeof(*vm));
+  vm_init(vm, sz);
+  return vm;
 }
 
 value

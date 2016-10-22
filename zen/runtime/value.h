@@ -25,5 +25,7 @@ int closure_pc(value cls);
 
 value value_add(value v1, value v2);
 
+void print_value(value v);
+
 
 #endif
