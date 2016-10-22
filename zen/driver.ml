@@ -10,6 +10,13 @@ let step_compile ir = Zinc.compile ir [Instruct.Stop]
 
 let step_run code = run code [] (Stack.create ()) (Stack.create ())
 
+let step_emit code =
+  let buf = Emit.new_buffer () in
+  let bc = Emit.emit buf code in
+  let out = open_out_bin "test.out" in
+  let _ = output_bytes out bc in
+  close_out out
+
 let eval s =
   let ast = step_parse s in
   let _ = step_infer ast in
