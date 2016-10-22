@@ -27,10 +27,10 @@ lexer.cmo : parser.cmi
 lexer.cmx : parser.cmx
 parser.cmo : type.cmo ast.cmo parser.cmi
 parser.cmx : type.cmx ast.cmx parser.cmi
-test.cmo :
-test.cmx :
 type.cmo :
 type.cmx :
+vm.cmo : instruct.cmo
+vm.cmx : instruct.cmx
 zinc.cmo : lambda.cmo instruct.cmo
 zinc.cmx : lambda.cmx instruct.cmx
 zinc_test.cmo : zinc.cmo lambda.cmo instruct.cmo

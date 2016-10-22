@@ -95,7 +95,7 @@ vm_run(struct VM* vm, char* code) {
       {
         uint8_t n =  code[vm->pc+1];
         if (vm->sp - vm->ctx.mark >= n) {
-          printf("CHECK: want %d args, have %d args", n, vm->sp - vm->ctx.mark);
+          printf("CHECK: want %d args, have %d args\n", n, vm->sp - vm->ctx.mark);
           vm->pc += 2;
         } else {
           printf("CHECK partial apply...");
@@ -118,7 +118,7 @@ vm_run(struct VM* vm, char* code) {
       {
         int n = code[vm->pc+1];
         int sz = env_length(vm->env);
-        if (sz >= n) {
+        if (sz > n) {
           vm->acc = env_get(vm->env, n);
         } else {
           vm->acc = vm->stack[vm->bp-n-sz];
@@ -142,10 +142,9 @@ vm_run(struct VM* vm, char* code) {
     case RETURN:
       vm->sp = vm->bp;
       vm->pc = ctx_pop(&vm->ctx);
-      printf("RETURN sp=%d", vm->sp);
+      printf("RETURN sp=%d\n", vm->sp);
       break;
     }
   }
-out:
   return value_unit;
 }

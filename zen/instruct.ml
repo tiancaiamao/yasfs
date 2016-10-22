@@ -7,10 +7,12 @@ type t =
   | Closure of t list
   | Tailapply
   | Apply
+  | Push
   | Pushmark
   | Copy
   | Pop
-  | Grab
+  | Grab of int
+  | UNENV
   | Return
   | Stop
   | Branch of t list * t list

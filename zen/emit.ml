@@ -16,13 +16,14 @@ type buffer = {mutable data: bytes; mutable pos: int};;
 
 let buffer_append b1 b2 =
   let len = Bytes.length b1.data in
-  if b1.pos + b2.pos > len then
+  (if b1.pos + b2.pos > len then
     let newbuf = Bytes.create ((len*2)+b2.pos) in
     Bytes.blit b1.data 0 newbuf 0 b1.pos;
     Bytes.blit b2.data 0 newbuf b1.pos b2.pos;
-    b1.data <- newbuf
+    b1.data <- newbuf;
   else
-    Bytes.blit b2.data 0 b1.data b1.pos b2.pos
+    Bytes.blit b2.data 0 b1.data b1.pos b2.pos);
+  b1.pos <- b1.pos + b2.pos
 
 let new_buffer () = {data = Bytes.create 32; pos = 0}
 
@@ -63,7 +64,22 @@ let rec emit_inst buf x =
     | Instruct.Closure l ->
       let tmpbuf = new_buffer () in
       List.iter (emit_inst tmpbuf) l;
+      o buf idCLOSURE;
+      o_uint32 buf tmpbuf.pos;
       buffer_append buf tmpbuf
+    | Instruct.Grab n ->
+      o buf idCHECK;
+      o_byte buf (char_of_int n);
+      o buf idENV
+    | Instruct.Pushmark ->
+      o buf idMARK
+    | Instruct.Push ->
+      o buf idPUSH
+    | Instruct.UNENV ->
+      o buf idUNENV
+    | Instruct.Access n ->
+      o buf idACCESS;
+      o_byte buf (char_of_int n)
 
 let emit buf bc =
   List.iter (emit_inst buf) bc;
