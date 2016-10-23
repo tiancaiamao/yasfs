@@ -6,7 +6,7 @@ let step_infer ast = Infer.infer_list ast
 
 let step_bruijn ast = Bruijn.ast2lambda [] (List.hd ast)
 
-let step_compile ir = Zinc.compile ir [Instruct.Stop]
+let step_compile ir = Zinc.compile ir [Instruct.Stop] 0
 
 (* let step_run code = run code [] (Stack.create ()) (Stack.create ()) *)
 

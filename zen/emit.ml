@@ -81,8 +81,11 @@ let rec emit_inst buf x =
     buffer_append buf tmpbuf
   | Instruct.Push ->
     o buf idPUSH
-  | Instruct.Access n ->
+  | Instruct.StackAccess n ->
     o buf idSTACKACC;
+    o_byte buf (char_of_int n)
+  | Instruct.EnvAccess n ->
+    o buf idENVACC;
     o_byte buf (char_of_int n)
 
 let emit buf bc =

@@ -63,9 +63,14 @@ vm_run(struct VM* vm, char* code) {
       {
         int32_t size = read_uint32(&code[vm->pc+1]);
         printf("CLOSURE\n");
-        // value new_env = env_append(vm->env, closure_env(vm->acc), &vm->stack[vm->mark+1], vm->sp-vm->mark-1);
-        // vm->acc = new_closure(vm->pc+6, new_env);
-        vm->acc = new_closure(vm->pc+6, vm->env);
+        if (vm->bp > 0) {
+          value new_env = env_append(vm->env, &vm->stack[vm->bp], vm->sp-vm->bp);
+          vm->acc = new_closure(vm->pc+6, new_env);
+          vm->sp = vm->bp;
+          vm->bp = 0;
+        } else {
+          vm->acc = new_closure(vm->pc+6, vm->env);
+        }
         vm->pc = vm->pc + size + 5;
       }
       break;
@@ -79,7 +84,7 @@ vm_run(struct VM* vm, char* code) {
         uint8_t n =  code[vm->pc+1];
         if (vm->sp - vm->mark > n) {
           printf("GRAB: want %d args, have %d args\n", n, vm->sp - vm->mark -1);
-          vm->bp = vm->sp-1;
+          vm->bp = vm->sp-n;
           vm->pc += 2;
         } else {
           printf("GRAB partial apply...\n");
@@ -111,7 +116,7 @@ vm_run(struct VM* vm, char* code) {
     case STACKACC:
       {
         int n = code[vm->pc+1];
-        vm->acc = vm->stack[vm->bp-n];
+        vm->acc = vm->stack[vm->bp+n];
         vm->pc += 2;
         printf("STACKACC: %d, bp=%d\n", n, vm->bp);
       }
@@ -123,6 +128,7 @@ vm_run(struct VM* vm, char* code) {
         vm->pc += 2;
         printf("ENVACC: %d\n", n);
       }
+      break;
     case PUSH:
       printf("PUSH: sp=%d\n", vm->sp);
       vm->stack[vm->sp] = vm->acc;
