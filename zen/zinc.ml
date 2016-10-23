@@ -34,18 +34,18 @@ and compile_tail exp = match exp with
     Lambda.Int v -> [Instruct.Const v]
   | Lambda.Bool v -> [Instruct.Bool v]
   | Lambda.Prim s -> [Instruct.Prim s]
-  | Lambda.Var n -> [Instruct.Access n; Instruct.Return]
+  | Lambda.Var n -> [Instruct.Access n]
   | Lambda.Bind t -> [Instruct.Bind]
-  | Lambda.Switch _ -> compile exp [Instruct.Return]
-  | Lambda.Tuple _ -> compile exp [Instruct.Return]
+  | Lambda.Switch _ -> compile exp []
+  | Lambda.Tuple _ -> compile exp []
   | Lambda.Plus _ -> compile exp []
-  | Lambda.Sub _ -> compile exp [Instruct.Return]
-  | Lambda.Mul _ -> compile exp [Instruct.Return]
-  | Lambda.Equal _ -> compile exp [Instruct.Return]
-  | Lambda.Field _ -> compile exp [Instruct.Return]
-  | Lambda.If _ -> compile exp [Instruct.Return]
+  | Lambda.Sub _ -> compile exp []
+  | Lambda.Mul _ -> compile exp []
+  | Lambda.Equal _ -> compile exp []
+  | Lambda.Field _ -> compile exp []
+  | Lambda.If _ -> compile exp []
   | Lambda.Fun (n,ts) ->
-    [Instruct.Grab n] @ (compile_body ts) @ [Instruct.Return]
+    [Instruct.Grab n] @ (compile_body ts) @ [Instruct.Return n]
     (* | [t] -> (match n with *)
     (*     | 0 -> compile_tail t *)
     (*     | _ -> (Instruct.Grab n)::(compile_tail (Lambda.Fun (n-1,[t])))) *)

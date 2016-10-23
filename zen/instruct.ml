@@ -13,7 +13,7 @@ type t =
   | Pop
   | Grab of int
   | UNENV
-  | Return
+  | Return of int
   | Stop
   | Branch of t list * t list
   | Bind

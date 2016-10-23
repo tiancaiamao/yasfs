@@ -63,7 +63,8 @@ vm_run(struct VM* vm, char* code) {
       {
         int32_t size = read_uint32(&code[vm->pc+1]);
         printf("CLOSURE\n");
-        // TODO should copy stack to env
+        // value new_env = env_append(vm->env, closure_env(vm->acc), &vm->stack[vm->mark+1], vm->sp-vm->mark-1);
+        // vm->acc = new_closure(vm->pc+6, new_env);
         vm->acc = new_closure(vm->pc+6, vm->env);
         vm->pc = vm->pc + size + 5;
       }
@@ -94,6 +95,19 @@ vm_run(struct VM* vm, char* code) {
         }
       }
       break;
+    case RESTART:
+      {
+        // TODO order!!!
+        int len = env_length(vm->env);
+        for (int i=0; i<len; i++) {
+          vm->stack[vm->sp] = env_get(vm->env, i);
+          vm->sp++;
+        }
+        vm->env = (value)NULL;
+        vm->bp = vm->sp-1;
+        vm->pc++;
+      }
+      break;
     case STACKACC:
       {
         int n = code[vm->pc+1];
@@ -122,12 +136,17 @@ vm_run(struct VM* vm, char* code) {
       vm->pc++;
       break;
     case RETURN:
-      printf("RETURN sp=%d mark=%d\n", vm->sp, vm->mark);
-
-      vm->env = vm->stack[vm->mark-2];
-      vm->pc = vm->stack[vm->mark-1];
-      vm->sp = vm->mark-2;
-      vm->mark = vm->stack[vm->mark];
+      if (vm->sp-vm->mark-1 > code[vm->pc+1]) {
+        printf("RETURN: more args apply %d sp=%d mark=%d\n", code[vm->pc+1], vm->sp, vm->mark);
+        vm->env = closure_env(vm->acc);
+        vm->pc = closure_pc(vm->acc);
+      } else {
+        printf("RETURN: %d sp=%d mark=%d\n", code[vm->pc+1], vm->sp, vm->mark);
+        vm->env = vm->stack[vm->mark-2];
+        vm->pc = vm->stack[vm->mark-1];
+        vm->sp = vm->mark-2;
+        vm->mark = vm->stack[vm->mark];
+      }
       break;
     }
   }
