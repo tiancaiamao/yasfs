@@ -87,8 +87,8 @@ vm_run(struct VM* vm, char* code) {
           closure_set_env(vm->acc, new_env);
           closure_set_pc(vm->acc, vm->pc-1); // RESTART
 
-          vm->env = vm->stack[vm->mark-1];
-          vm->pc = vm->stack[vm->mark-2];
+          vm->env = vm->stack[vm->mark-2];
+          vm->pc = vm->stack[vm->mark-1];
           vm->sp = vm->mark-2;
           vm->mark = vm->stack[vm->mark];
         }
