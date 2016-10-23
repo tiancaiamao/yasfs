@@ -8,7 +8,7 @@ type t =
   | Tailapply
   | Apply
   | Push
-  | Pushmark
+  | PushRetAddr of t list
   | Copy
   | Pop
   | Grab of int

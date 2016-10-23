@@ -137,6 +137,11 @@ closure_set_env(value cls, value env) {
   ((struct Closure*)cls)->env = (struct Env*)(env);
 }
 
+void
+closure_set_pc(value cls, int pc) {
+  ((struct Closure*)cls)->pc = pc;
+}
+
 value
 value_add(value a, value b) {
   return (((a>>1) + (b>>1)) << 1) | 1;

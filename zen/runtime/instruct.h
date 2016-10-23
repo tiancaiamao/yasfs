@@ -3,16 +3,16 @@
 
 enum{
   STOP    = 1,
-  MARK    = 2,
+  PUSHADDR = 2,
   CONST   = 3,
   PUSH    = 4,
   CLOSURE = 5,
   APPLY   = 6,
-  CHECK   = 7,
-  ENV     = 8,
-  ACCESS  = 9,
-  ADDINT  = 10,
-  UNENV   = 11,
+  GRAB    = 7,
+  RESTART  = 8,
+  STACKACC = 9,
+  ENVACC  = 10,
+  ADDINT  = 11,
   RETURN  = 12,
   BRANCH  = 13,
 };
