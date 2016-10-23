@@ -66,7 +66,6 @@ vm_run(struct VM* vm, char* code) {
         if (vm->bp > 0) {
           value new_env = env_append(vm->env, &vm->stack[vm->bp], vm->sp-vm->bp);
           vm->acc = new_closure(vm->pc+6, new_env);
-          vm->sp = vm->bp;
           vm->bp = 0;
         } else {
           vm->acc = new_closure(vm->pc+6, vm->env);
@@ -103,6 +102,7 @@ vm_run(struct VM* vm, char* code) {
     case RESTART:
       {
         // TODO order!!!
+        printf("RESTART\n");
         int len = env_length(vm->env);
         for (int i=0; i<len; i++) {
           vm->stack[vm->sp] = env_get(vm->env, i);
@@ -146,6 +146,7 @@ vm_run(struct VM* vm, char* code) {
         printf("RETURN: more args apply %d sp=%d mark=%d\n", code[vm->pc+1], vm->sp, vm->mark);
         vm->env = closure_env(vm->acc);
         vm->pc = closure_pc(vm->acc);
+        vm->sp = vm->sp - code[vm->pc+1];
       } else {
         printf("RETURN: %d sp=%d mark=%d\n", code[vm->pc+1], vm->sp, vm->mark);
         vm->env = vm->stack[vm->mark-2];
