@@ -73,13 +73,15 @@ vm_run(struct VM* vm, char* code) {
       {
         value v = read_value(&code[vm->pc+1]);
         printf("CONST %lu\n", v>>1);
+        vm->acc = v;
         vm->pc += 9;
       }
       break;
     case CLOSURE:
       {
         int32_t size = read_uint32(&code[vm->pc+1]);
-        printf("CLOSURE %d\n", size);
+        printf("CLOSURE\n");
+        // TODO should copy stack to env
         vm->acc = new_closure(vm->pc+5, vm->env);
         vm->pc = vm->pc + size + 5;
       }
@@ -94,17 +96,22 @@ vm_run(struct VM* vm, char* code) {
     case CHECK:
       {
         uint8_t n =  code[vm->pc+1];
-        if (vm->sp - vm->ctx.mark >= n) {
+        int len = env_length(closure_env(vm->acc));
+        if (len + vm->sp - vm->ctx.mark >= n) {
           printf("CHECK: want %d args, have %d args\n", n, vm->sp - vm->ctx.mark);
           vm->pc += 2;
         } else {
-          printf("CHECK partial apply...");
-          // TODO ...
+          printf("CHECK partial apply...\n");
+          // TODO what about manual release it instead of GC
+          value new_env = env_append(closure_env(vm->acc), &vm->stack[vm->ctx.mark], vm->sp-vm->ctx.mark);
+          closure_set_env(vm->acc, new_env);
+          vm->sp = vm->ctx.mark;
+          vm->pc = ctx_pop(&vm->ctx);
         }
       }
       break;
     case ENV:
-      printf("ENV\n");
+      printf("ENV stk=%d env=%d\n", vm->sp - vm->bp, env_length(vm->env));
       ctx_push(&vm->ctx, vm->bp);
       vm->bp = vm->sp - 1;
       vm->pc++;
@@ -146,5 +153,5 @@ vm_run(struct VM* vm, char* code) {
       break;
     }
   }
-  return value_unit;
+  return vm->acc;
 }

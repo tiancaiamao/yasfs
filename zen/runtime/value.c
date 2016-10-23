@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 
 bool
@@ -20,6 +21,7 @@ enum {
   tag_tuple,
   tag_closure,
   tag_string,
+  tag_env,
 };
 
 struct block_head {
@@ -91,12 +93,24 @@ int
 env_length(value v) {
   if (v == (value)NULL) return 0;
   struct Env* env = (struct Env*)v;
-  return env->head.size / sizeof(value) - 1;
+  return env->head.size - 1;
 }
 
 value
 env_get(value v, int n) {
   return ((struct Env*)v)->data[n];
+}
+
+value
+env_append(value v, value *ptr, int count) {
+  if (count == 0) return v;
+  int len = env_length(v);
+  value ret = block_alloc(len+count+1, tag_env);
+  struct Env* ev = (struct Env*)v;
+  struct Env* er = (struct Env*)ret;
+  memcpy(&er->data, &ev->data, len*sizeof(value));
+  memcpy(&er->data[len], ptr, count*sizeof(value));
+  return ret;
 }
 
 value
@@ -114,6 +128,16 @@ closure_pc(value v) {
 }
 
 value
+closure_env(value v) {
+  return (value)(((struct Closure*)v)->env);
+}
+
+void
+closure_set_env(value cls, value env) {
+  ((struct Closure*)cls)->env = (struct Env*)(env);
+}
+
+value
 value_add(value a, value b) {
-  return a + b;
+  return (((a>>1) + (b>>1)) << 1) | 1;
 }

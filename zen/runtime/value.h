@@ -19,9 +19,12 @@ value value_unit;
 
 int env_length(value env);
 value env_get(value env, int n);
+value env_append(value v, value *ptr, int count);
 
 value new_closure(int pc, value env);
 int closure_pc(value cls);
+value closure_env(value cls);
+void closure_set_env(value cls, value env);
 
 value value_add(value v1, value v2);
 
