@@ -108,7 +108,6 @@ vm_run(struct VM* vm, char* code) {
           vm->sp++;
         }
         vm->env = (value)NULL;
-        vm->bp = vm->sp-1;
         vm->pc++;
       }
       break;
@@ -153,9 +152,9 @@ vm_run(struct VM* vm, char* code) {
     case RETURN:
       if (vm->sp-vm->mark-1 > code[vm->pc+1]) {
         printf("RETURN: more args apply %d sp=%d mark=%d\n", code[vm->pc+1], vm->sp, vm->mark);
+        vm->sp = vm->sp - code[vm->pc+1];
         vm->env = closure_env(vm->acc);
         vm->pc = closure_pc(vm->acc);
-        vm->sp = vm->sp - code[vm->pc+1];
       } else {
         printf("RETURN: %d sp=%d mark=%d\n", code[vm->pc+1], vm->sp, vm->mark);
         vm->env = vm->stack[vm->mark-2];
