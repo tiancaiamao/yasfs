@@ -11,6 +11,7 @@ let idENVACC  = 10
 let idADDINT  = 11
 let idRETURN  = 12
 let idBRANCH  = 13
+let idBRANCHIF = 14
 
 type buffer = {mutable data: bytes; mutable pos: int};;
 
@@ -87,6 +88,17 @@ let rec emit_inst buf x =
   | Instruct.EnvAccess n ->
     o buf idENVACC;
     o_byte buf (char_of_int n)
+  | Instruct.Branch (t,f) ->
+    let truebuf = new_buffer () in
+    let falsebuf = new_buffer () in
+    List.iter (emit_inst truebuf) t;
+    List.iter (emit_inst falsebuf) f;
+    o buf idBRANCHIF;
+    o_uint32 buf (falsebuf.pos+5);
+    buffer_append buf falsebuf;
+    o buf idBRANCH;
+    o_uint32 buf truebuf.pos;
+    buffer_append buf truebuf
 
 let emit buf bc =
   List.iter (emit_inst buf) bc;

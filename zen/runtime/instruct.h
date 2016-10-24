@@ -15,6 +15,7 @@ enum{
   ADDINT  = 11,
   RETURN  = 12,
   BRANCH  = 13,
+  BRANCHIF = 14,
 };
 
 #endif

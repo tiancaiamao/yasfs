@@ -66,7 +66,6 @@ vm_run(struct VM* vm, char* code) {
         if (vm->bp > 0) {
           value new_env = env_append(vm->env, &vm->stack[vm->bp], vm->sp-vm->bp);
           vm->acc = new_closure(vm->pc+6, new_env);
-          vm->bp = 0;
         } else {
           vm->acc = new_closure(vm->pc+6, vm->env);
         }
@@ -153,6 +152,17 @@ vm_run(struct VM* vm, char* code) {
         vm->pc = vm->stack[vm->mark-1];
         vm->sp = vm->mark-2;
         vm->mark = vm->stack[vm->mark];
+      }
+      vm->bp = 0;
+      break;
+    case BRANCH:
+      vm->pc = vm->pc+5+read_uint32(&code[vm->pc+1]);
+      break;
+    case BRANCHIF:
+      if (vm->acc == value_true) {
+        vm->pc = vm->pc+5+read_uint32(&code[vm->pc+1]);
+      } else {
+        vm->pc += 5;
       }
       break;
     }
