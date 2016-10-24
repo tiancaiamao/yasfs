@@ -12,6 +12,7 @@ let idADDINT  = 11
 let idRETURN  = 12
 let idBRANCH  = 13
 let idBRANCHIF = 14
+let idEQ      = 15
 
 type buffer = {mutable data: bytes; mutable pos: int};;
 
@@ -99,6 +100,7 @@ let rec emit_inst buf x =
     o buf idBRANCH;
     o_uint32 buf truebuf.pos;
     buffer_append buf truebuf
+  | Instruct.Equal -> o buf idEQ
 
 let emit buf bc =
   List.iter (emit_inst buf) bc;

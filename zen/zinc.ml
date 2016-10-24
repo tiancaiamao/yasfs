@@ -32,7 +32,7 @@ let rec compile exp code threshold = match exp with
   | Lambda.Field (n, b) ->
     compile b ((Instruct.Field n)::code) threshold
   | Lambda.Equal (a, b) ->
-    compile a (compile b (Instruct.Equal::code) threshold) threshold
+    compile a (Instruct.Push::(compile b (Instruct.Equal::code) threshold)) threshold
 and compile_tail exp threshold = match exp with
     Lambda.Int v -> [Instruct.Const v]
   | Lambda.Bool v -> [Instruct.Bool v]

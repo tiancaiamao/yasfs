@@ -140,6 +140,16 @@ vm_run(struct VM* vm, char* code) {
       vm->sp--;
       vm->pc++;
       break;
+    case EQ:
+      printf("EQ\n");
+      if (vm->acc == vm->stack[vm->sp-1]) {
+        vm->acc = value_true;
+      } else {
+        vm->acc = value_false;
+      }
+      vm->sp--;
+      vm->pc++;
+      break;
     case RETURN:
       if (vm->sp-vm->mark-1 > code[vm->pc+1]) {
         printf("RETURN: more args apply %d sp=%d mark=%d\n", code[vm->pc+1], vm->sp, vm->mark);
@@ -156,12 +166,15 @@ vm_run(struct VM* vm, char* code) {
       vm->bp = 0;
       break;
     case BRANCH:
+      printf("BRANCH\n");
       vm->pc = vm->pc+5+read_uint32(&code[vm->pc+1]);
       break;
     case BRANCHIF:
       if (vm->acc == value_true) {
+        printf("BRANCHIF true\n");
         vm->pc = vm->pc+5+read_uint32(&code[vm->pc+1]);
       } else {
+        printf("BRANCHIF false\n");
         vm->pc += 5;
       }
       break;
