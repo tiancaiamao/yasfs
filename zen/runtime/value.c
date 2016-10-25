@@ -50,7 +50,8 @@ struct Closure {
 
 struct Tuple {
   struct block_head head;
-  uint16_t tag;
+  uint32_t tag;
+  uint32_t size;
   value data[0];
 };
 
@@ -140,6 +141,21 @@ closure_set_env(value cls, value env) {
 void
 closure_set_pc(value cls, int pc) {
   ((struct Closure*)cls)->pc = pc;
+}
+
+value
+new_tuple(uint32_t tag, uint32_t size) {
+  value b = block_alloc(size+3, tag_tuple);
+  struct Tuple* t = (struct Tuple*)b;
+  t->tag = tag;
+  t->size = size;
+  return b;
+}
+
+void
+tuple_set(value tu, int i, value v) {
+  struct Tuple *t = (struct Tuple*)tu;
+  t->data[i] = v;
 }
 
 value

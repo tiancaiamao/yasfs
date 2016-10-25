@@ -10,10 +10,7 @@ type t =
   | Apply
   | Push
   | PushRetAddr of t list
-  | Copy
-  | Pop
   | Grab of int
-  | UNENV
   | Return of int
   | Stop
   | Branch of t list * t list

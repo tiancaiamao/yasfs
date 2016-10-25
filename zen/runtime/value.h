@@ -32,6 +32,10 @@ value value_sub(value v1, value v2);
 value value_mul(value v1, value v2);
 value value_div(value v1, value v2);
 
+
+value new_tuple(uint32_t tag, uint32_t size);
+void tuple_set(value tu, int i, value v);
+
 void print_value(value v);
 
 

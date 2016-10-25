@@ -20,6 +20,7 @@ enum{
   SUBINT  = 16,
   MULINT  = 17,
   DIVINT  = 18,
+  MAKEBLOCK = 19,
 };
 
 #endif

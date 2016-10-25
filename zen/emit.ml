@@ -16,6 +16,7 @@ let idEQ      = 15
 let idSUBINT  = 16
 let idMULINT  = 17
 let idDIVINT  = 18
+let idMAKEBLOCK = 19
 
 type buffer = {mutable data: bytes; mutable pos: int};;
 
@@ -107,6 +108,10 @@ let rec emit_inst buf x =
     o_uint32 buf truebuf.pos;
     buffer_append buf truebuf
   | Instruct.Equal -> o buf idEQ
+  | Instruct.MakeTuple (tag, size) ->
+    o buf idMAKEBLOCK;
+    o_uint32 buf tag;
+    o_uint32 buf size
 
 let emit buf bc =
   List.iter (emit_inst buf) bc;

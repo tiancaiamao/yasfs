@@ -195,6 +195,22 @@ vm_run(struct VM* vm, char* code) {
         vm->pc += 5;
       }
       break;
+    case MAKEBLOCK:
+      {
+        uint32_t tag = read_uint32(&code[vm->pc+1]);
+        uint32_t size = read_uint32(&code[vm->pc+5]);
+        value t =  new_tuple(tag, size);
+        if (size > 0) {
+          tuple_set(t, 0, vm->acc);
+          for (int i=1; i<size; i++) {
+            tuple_set(t, i, vm->stack[vm->sp]);
+            vm->sp--;
+          }
+        }
+        vm->acc = t;
+        vm->pc += 9;
+      }
+      break;
     }
   }
   return vm->acc;
