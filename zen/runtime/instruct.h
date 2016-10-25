@@ -17,6 +17,9 @@ enum{
   BRANCH  = 13,
   BRANCHIF = 14,
   EQ      = 15,
+  SUBINT  = 16,
+  MULINT  = 17,
+  DIVINT  = 18,
 };
 
 #endif

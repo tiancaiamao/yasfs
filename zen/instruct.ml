@@ -21,6 +21,7 @@ type t =
   | Plus
   | Mul
   | Sub
+  | Div
   | Equal
   | Field of int
   | Switch of (int * t list) list

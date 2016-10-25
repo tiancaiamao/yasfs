@@ -11,6 +11,7 @@ type t =
   | Plus of t * t
   | Sub of t * t
   | Mul of t * t
+  | Div of t * t
   | Equal of t * t
   | Field of int * t
   | Switch of t * (string * t) list

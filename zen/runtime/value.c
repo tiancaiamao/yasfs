@@ -146,3 +146,18 @@ value
 value_add(value a, value b) {
   return (((a>>1) + (b>>1)) << 1) | 1;
 }
+
+value
+value_sub(value a, value b) {
+  return (((a>>1) - (b>>1)) << 1) | 1;
+}
+
+value
+value_mul(value a, value b) {
+  return (((a>>1) * (b>>1)) << 1) | 1;
+}
+
+value
+value_div(value a, value b) {
+  return (((a>>1) / (b>>1)) << 1) | 1;
+}

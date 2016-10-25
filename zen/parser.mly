@@ -18,6 +18,7 @@
 %token PLUS
 %token MUL
 %token SUB
+%token DIV
 %token FIELD
 %token TRUE
 %token FALSE
@@ -102,6 +103,8 @@ exp:
     { Sub($1, $3) }
 | exp MUL exp
     { Mul($1, $3) }
+| exp DIV exp
+    { Div($1, $3) }
 | exp EQUAL exp
     { Equal($1, $3) }
 | FIELD INT exp

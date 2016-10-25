@@ -24,11 +24,13 @@ let rec compile exp code threshold = match exp with
                  (List.map (fun (i, x) -> (i, (compile x code threshold))) cases)] threshold
   | Lambda.Prim s -> (Instruct.Prim s)::code
   | Lambda.Plus (a, b) ->
-    compile b (Instruct.Push::(compile a (Instruct.Plus::code)) threshold) threshold
+    compile a (Instruct.Push::(compile b (Instruct.Plus::code)) threshold) threshold
   | Lambda.Sub (a, b) ->
-    compile a (compile b (Instruct.Sub::code) threshold) threshold
+    compile a (Instruct.Push::(compile b (Instruct.Sub::code)) threshold) threshold
   | Lambda.Mul (a, b) ->
-    compile a (compile b (Instruct.Mul::code) threshold) threshold
+    compile a (Instruct.Push::(compile b (Instruct.Mul::code)) threshold) threshold
+  | Lambda.Div (a, b) ->
+    compile a (Instruct.Push::(compile b (Instruct.Div::code)) threshold) threshold
   | Lambda.Field (n, b) ->
     compile b ((Instruct.Field n)::code) threshold
   | Lambda.Equal (a, b) ->
@@ -46,6 +48,7 @@ and compile_tail exp threshold = match exp with
   | Lambda.Plus _ -> compile exp [] threshold
   | Lambda.Sub _ -> compile exp [] threshold
   | Lambda.Mul _ -> compile exp [] threshold
+  | Lambda.Div _ -> compile exp [] threshold
   | Lambda.Equal _ -> compile exp [] threshold
   | Lambda.Field _ -> compile exp [] threshold
   | Lambda.If _ -> compile exp [] threshold

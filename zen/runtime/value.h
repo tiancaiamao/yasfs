@@ -28,6 +28,9 @@ void closure_set_env(value cls, value env);
 void closure_set_pc(value cls, int pc);
 
 value value_add(value v1, value v2);
+value value_sub(value v1, value v2);
+value value_mul(value v1, value v2);
+value value_div(value v1, value v2);
 
 void print_value(value v);
 

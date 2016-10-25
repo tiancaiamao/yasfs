@@ -139,6 +139,24 @@ vm_run(struct VM* vm, char* code) {
       vm->sp--;
       vm->pc++;
       break;
+    case SUBINT:
+      printf("SUBINT\n");
+      vm->acc = value_sub(vm->stack[vm->sp-1], vm->acc);
+      vm->sp--;
+      vm->pc++;
+      break;
+    case MULINT:
+      printf("MULINT\n");
+      vm->acc = value_mul(vm->stack[vm->sp-1], vm->acc);
+      vm->sp--;
+      vm->pc++;
+      break;
+    case DIVINT:
+      printf("DIVINT\n");
+      vm->acc = value_div(vm->stack[vm->sp-1], vm->acc);
+      vm->sp--;
+      vm->pc++;
+      break;
     case EQ:
       printf("EQ\n");
       if (vm->acc == vm->stack[vm->sp-1]) {

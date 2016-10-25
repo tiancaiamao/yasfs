@@ -35,6 +35,8 @@ let rec ast2lambda env ast = match ast with
       (ast2lambda env t1), (ast2lambda env t2))
   | Ast.Mul (t1, t2) -> Lambda.Mul (
       (ast2lambda env t1), (ast2lambda env t2))
+  | Ast.Div (t1, t2) -> Lambda.Div (
+      (ast2lambda env t1), (ast2lambda env t2))
   | Ast.Field (n, t) -> Lambda.Field (n, ast2lambda env t)
   | Ast.Equal (t1, t2) -> Lambda.Equal (
       (ast2lambda env t1), (ast2lambda env t2))

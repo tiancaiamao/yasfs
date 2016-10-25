@@ -13,6 +13,9 @@ let idRETURN  = 12
 let idBRANCH  = 13
 let idBRANCHIF = 14
 let idEQ      = 15
+let idSUBINT  = 16
+let idMULINT  = 17
+let idDIVINT  = 18
 
 type buffer = {mutable data: bytes; mutable pos: int};;
 
@@ -62,6 +65,9 @@ let rec emit_inst buf x =
   | Instruct.Stop -> o buf idSTOP
   | Instruct.Apply -> o buf idAPPLY
   | Instruct.Plus -> o buf idADDINT
+  | Instruct.Sub -> o buf idSUBINT
+  | Instruct.Mul -> o buf idMULINT
+  | Instruct.Div -> o buf idDIVINT
   | Instruct.Return n ->
     o buf idRETURN;
     o_byte buf (char_of_int n)
