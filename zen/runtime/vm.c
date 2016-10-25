@@ -203,13 +203,17 @@ vm_run(struct VM* vm, char* code) {
         if (size > 0) {
           tuple_set(t, 0, vm->acc);
           for (int i=1; i<size; i++) {
-            tuple_set(t, i, vm->stack[vm->sp]);
+            tuple_set(t, i, vm->stack[vm->sp-1]);
             vm->sp--;
           }
         }
         vm->acc = t;
         vm->pc += 9;
       }
+      break;
+    case GETFIELD:
+      vm->acc = tuple_get(vm->acc, read_uint32(&code[vm->pc+1]));
+      vm->pc += 5;
       break;
     }
   }

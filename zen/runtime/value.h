@@ -35,6 +35,7 @@ value value_div(value v1, value v2);
 
 value new_tuple(uint32_t tag, uint32_t size);
 void tuple_set(value tu, int i, value v);
+value tuple_get(value tu, int i);
 
 void print_value(value v);
 

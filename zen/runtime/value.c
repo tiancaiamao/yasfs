@@ -159,6 +159,12 @@ tuple_set(value tu, int i, value v) {
 }
 
 value
+tuple_get(value tu, int i) {
+  struct Tuple *t = (struct Tuple*)tu;
+  return t->data[i];
+}
+
+value
 value_add(value a, value b) {
   return (((a>>1) + (b>>1)) << 1) | 1;
 }

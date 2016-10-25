@@ -21,6 +21,7 @@ enum{
   MULINT  = 17,
   DIVINT  = 18,
   MAKEBLOCK = 19,
+  GETFIELD = 20,
 };
 
 #endif

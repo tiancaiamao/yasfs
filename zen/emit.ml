@@ -17,6 +17,7 @@ let idSUBINT  = 16
 let idMULINT  = 17
 let idDIVINT  = 18
 let idMAKEBLOCK = 19
+let idGETFIELD = 20
 
 type buffer = {mutable data: bytes; mutable pos: int};;
 
@@ -112,6 +113,9 @@ let rec emit_inst buf x =
     o buf idMAKEBLOCK;
     o_uint32 buf tag;
     o_uint32 buf size
+  | Instruct.Field i ->
+    o buf idGETFIELD;
+    o_uint32 buf i
 
 let emit buf bc =
   List.iter (emit_inst buf) bc;

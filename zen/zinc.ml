@@ -1,9 +1,12 @@
 let rec compile exp code threshold = match exp with
     Lambda.Int v -> (Instruct.Const v)::code
   | Lambda.Bool v -> (Instruct.Bool v)::code
-  | Lambda.Tuple (tag, vs) -> let n = (List.length vs) in
-    (List.flatten (List.map (fun x -> compile x [] threshold) vs)) @
-    (Instruct.MakeTuple (tag,n))::code
+  | Lambda.Tuple (tag, vs) ->
+    let n = (List.length vs) in
+    if n = 0 then Instruct.MakeTuple (tag, 0)::code else
+      let fn a b = compile b (Instruct.Push::a) threshold in
+      let init = compile (List.hd vs) ((Instruct.MakeTuple (tag,n))::code) threshold in
+      List.fold_left fn init (List.tl vs)
   | Lambda.Var n ->
     if n < threshold
     then (Instruct.StackAccess n)::code
