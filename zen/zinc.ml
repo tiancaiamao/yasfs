@@ -56,9 +56,9 @@ and compile_tail exp threshold = match exp with
   | Lambda.Field _ -> compile exp [] threshold
   | Lambda.If _ -> compile exp [] threshold
   | Lambda.Fun (n,ts) ->
-    [Instruct.Grab n] @ (compile_body ts n) @ [Instruct.Return n]
+    [Instruct.Grab n] @ (compile_body ts n) @ [Instruct.Return]
   | Lambda.Fun1 (n,ts) ->
-    [Instruct.Grab (n-1); Instruct.Push] @ (compile_body ts n) @ [Instruct.Return (n-1)]
+    [Instruct.Grab (n-1); Instruct.Push] @ (compile_body ts n) @ [Instruct.Return]
   (* | [t] -> (match n with *)
   (*     | 0 -> compile_tail t n *)
   (*     | _ -> (Instruct.Grab n)::(compile_tail (Lambda.Fun (n-1,[t])) n)) *)

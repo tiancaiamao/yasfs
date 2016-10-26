@@ -10,7 +10,7 @@ type t =
   | Push
   | PushRetAddr of t list
   | Grab of int
-  | Return of int
+  | Return
   | Stop
   | Branch of t list * t list
   | Bind

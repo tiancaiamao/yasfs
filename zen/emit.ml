@@ -70,9 +70,8 @@ let rec emit_inst buf x =
   | Instruct.Sub -> o buf idSUBINT
   | Instruct.Mul -> o buf idMULINT
   | Instruct.Div -> o buf idDIVINT
-  | Instruct.Return n ->
+  | Instruct.Return ->
     o buf idRETURN;
-    o_byte buf (char_of_int n)
   | Instruct.Closure l ->
     let tmpbuf = new_buffer () in
     List.iter (emit_inst tmpbuf) l;
