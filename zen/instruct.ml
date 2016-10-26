@@ -6,7 +6,6 @@ type t =
   | StackAccess of int
   | EnvAccess of int
   | Closure of t list
-  | Tailapply
   | Apply
   | Push
   | PushRetAddr of t list
