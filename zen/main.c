@@ -28,7 +28,7 @@ main(int argc, char* argv[]) {
     off += n;
   }
 
-  struct VM* vm = vm_new(200);
+  struct VM* vm = vm_new(4000);
   value res = vm_run(vm, buf);
   print_value(res);
 
