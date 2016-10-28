@@ -30,3 +30,10 @@
 添加了tuple类型
 field操作符，用于取tuple里面的值
 switch case表达式，用于tuple的tag匹配
+
+## v0.0.5
+
+一句话描述：用C重写了bytecode解释器
+
+确定了指令集,调用协议
+基本按照ppt里面最高级别的优化实现
