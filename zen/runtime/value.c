@@ -164,6 +164,11 @@ tuple_get(value tu, int i) {
   return t->data[i];
 }
 
+uint32_t
+tuple_tag(value t) {
+  return ((struct Tuple*)t)->tag;
+}
+
 value
 value_add(value a, value b) {
   return (((a>>1) + (b>>1)) << 1) | 1;

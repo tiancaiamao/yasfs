@@ -18,6 +18,7 @@ let idMULINT  = 17
 let idDIVINT  = 18
 let idMAKEBLOCK = 19
 let idGETFIELD = 20
+let idSWITCH  = 21
 
 type buffer = {mutable data: bytes; mutable pos: int};;
 
@@ -58,6 +59,16 @@ let o_uint64 b u =
 
 let o b id =
   o_byte b (id land 255 |> char_of_int)
+
+
+let rec fnbuf = function
+  | [] -> 0
+  | buf::[] -> buf.pos
+  | x::xs ->
+    let ofst = fnbuf xs in
+    o x idBRANCH;
+    o_uint32 x ofst;
+    ofst+x.pos
 
 let rec emit_inst buf x =
   match x with
@@ -115,6 +126,22 @@ let rec emit_inst buf x =
   | Instruct.Field i ->
     o buf idGETFIELD;
     o_uint32 buf i
+  | Instruct.Switch l ->
+    let emits = function ls ->
+      let buf = new_buffer() in
+      List.iter (emit_inst buf) ls;
+      buf
+    in
+    let ii = List.map (fun (i,_) -> i) l in
+    let tt = List.map (fun (_,t) -> t) l in
+    let ll = List.map emits tt in
+    fnbuf ll;
+    o buf idSWITCH;
+    o_uint32 buf (List.length ll);
+    List.iter2 (fun i v ->
+        o_uint32 buf i;
+        o_uint32 buf v.pos) ii ll;
+    List.iter (buffer_append buf) ll
 
 let emit buf bc =
   List.iter (emit_inst buf) bc;

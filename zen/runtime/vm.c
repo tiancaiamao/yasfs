@@ -197,6 +197,7 @@ vm_run(struct VM* vm, char* code) {
       break;
     case MAKEBLOCK:
       {
+        printf("MAKEBLOCK\n");
         uint32_t tag = read_uint32(&code[vm->pc+1]);
         uint32_t size = read_uint32(&code[vm->pc+5]);
         value t =  new_tuple(tag, size);
@@ -212,8 +213,25 @@ vm_run(struct VM* vm, char* code) {
       }
       break;
     case GETFIELD:
+      printf("GETFIELD\n");
       vm->acc = tuple_get(vm->acc, read_uint32(&code[vm->pc+1]));
       vm->pc += 5;
+      break;
+    case SWITCH:
+      {
+        printf("SWITCH\n");
+        uint32_t n = read_uint32(&code[vm->pc+1]);
+        int ofst = 0;
+        for (int i=0; i<n; i++) {
+          uint32_t tag = read_uint32(&code[vm->pc+5+i*8]);
+          uint32_t size = read_uint32(&code[vm->pc+9+i*8]);
+          if (tag == tuple_tag(vm->acc)) {
+            break;
+          }
+          ofst += size;
+        }
+        vm->pc = vm->pc+5+8*n+ofst;
+      }
       break;
     }
   }
