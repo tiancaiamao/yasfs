@@ -53,8 +53,8 @@ let o_uint32 b u =
   o_byte b p0; o_byte b p1; o_byte b p3; o_byte b p4
 
 let o_uint64 b u =
-  let u1 = u land 65535 in
-  let u2 = u land 65535 lsr 32 in
+  let u1 = u land 4294967295 in
+  let u2 = u lsr 32 land 4294967295 in
   o_uint32 b u1; o_uint32 b u2
 
 let o b id =
