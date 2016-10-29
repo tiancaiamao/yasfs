@@ -19,12 +19,15 @@ let rec compile exp code threshold = match exp with
     let init = compile t [Instruct.Apply] threshold in
     let f = (fun a b -> compile b (Instruct.Push::a) threshold) in
     (Instruct.PushRetAddr code)::(List.fold_left f init ts)
+  | Lambda.CCall (prim,ts) ->
+    let init = Instruct.String prim::(Instruct.CCall (List.length ts))::code in
+    let f = (fun a b -> compile b (Instruct.Push::a) threshold) in
+    List.fold_left f init ts
   | Lambda.If (t, succ, fail) ->
     compile t [Instruct.Branch ((compile succ code threshold), (compile fail code threshold))] threshold
   | Lambda.Switch (t, cases) ->
     compile t [Instruct.Switch
                  (List.map (fun (i, x) -> (i, (compile x code threshold))) cases)] threshold
-  | Lambda.Prim s -> (Instruct.Prim (s,0))::code
   | Lambda.Plus (a, b) ->
     compile a (Instruct.Push::(compile b (Instruct.Plus::code)) threshold) threshold
   | Lambda.Sub (a, b) ->
@@ -41,7 +44,7 @@ and compile_tail exp threshold = match exp with
     Lambda.Int v -> [Instruct.Const v; Instruct.Return]
   | Lambda.Bool v -> [Instruct.Bool v; Instruct.Return]
   | Lambda.String s -> [Instruct.String s; Instruct.Return]
-  | Lambda.Prim s -> [Instruct.Prim (s,0); Instruct.Return]
+  | Lambda.CCall _ -> compile exp [Instruct.Return] threshold
   | Lambda.Var n -> if n < threshold
     then [Instruct.StackAccess n; Instruct.Return]
     else [Instruct.EnvAccess (n-threshold); Instruct.Return]

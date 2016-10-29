@@ -263,6 +263,7 @@ vm_run(struct VM* vm, char* code) {
     case CCALL:
       {
         uint32_t n = read_uint32(&code[vm->pc+1]);
+        printf("CCALL: n=%d\n", n);
         char *prim = value_string(vm->acc);
         void *fn_ptr = dlsym(vm->handle, prim);
         if (fn_ptr == NULL) {
@@ -276,6 +277,7 @@ vm_run(struct VM* vm, char* code) {
     case STRING:
       {
         uint32_t n = read_uint32(&code[vm->pc+1]);
+        printf("STRING: %s\n", &code[vm->pc+5]);
         vm->acc = new_string(&code[vm->pc+5], n);
         vm->pc += 5+n+1;
       }
@@ -295,7 +297,8 @@ c_call(struct VM* vm, void *ptr, int n) {
   case 1:
     {
       value (*fn_ptr)(value) = ptr;
-      return fn_ptr(vm->stack[vm->sp-1]);
+      value ret = fn_ptr(vm->stack[vm->sp-1]);
+      return ret;
     }
   case 2:
     {

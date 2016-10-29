@@ -5,6 +5,7 @@ type t =
   | Var of int
   | Tuple of int * t list
   | App of t * t list
+  | CCall of string * t list
   | Fun of int * t list
   | Fun1 of int * t list
   | Bind of t
@@ -15,5 +16,4 @@ type t =
   | Div of t * t
   | Field of int * t
   | Equal of t * t
-  | Prim of string
   | Switch of t * (int * t) list

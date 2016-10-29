@@ -19,6 +19,7 @@ let rec ast2lambda env ast = match ast with
   | Ast.Int v -> Lambda.Int v
   | Ast.String s -> Lambda.String s
   | Ast.App (t, ts) -> Lambda.App (ast2lambda env t, List.map (ast2lambda env) ts)
+  | Ast.CCall (str, ts) -> Lambda.CCall (str, List.map (ast2lambda env) ts)
   | Ast.Fun (ts, t) ->
     Lambda.Fun (List.length ts,
                 let e = extend_env env ts in

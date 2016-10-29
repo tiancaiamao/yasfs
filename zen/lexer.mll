@@ -69,6 +69,8 @@ rule token = parse
     { CASE }
 | "field"
     { FIELD }
+| "ccall"
+    { CCALL }
 | ':'
     { COLON }
 | ":="

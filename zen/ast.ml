@@ -4,6 +4,7 @@ type t =
   | String of string
   | Var of string
   | App of t * t list
+  | CCall of string * t list
   | Fun of string list * t list
   | Fun1 of string list * t list
   | Bind of string * t

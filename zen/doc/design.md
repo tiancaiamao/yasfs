@@ -289,3 +289,7 @@ value bar(value list) {
 ```
 
 通过一个栈交互
+
+primitive不是first-class的，并且不支持partial apply。就是primitive不可以当作一个值进行传递。
+
+添加一个操作符ccall

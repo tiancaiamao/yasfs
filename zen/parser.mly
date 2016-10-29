@@ -24,6 +24,7 @@
 %token TRUE
 %token FALSE
 %token FN
+%token CCALL
 %token LPAREN
 %token RPAREN
 %token LBRACE
@@ -100,6 +101,8 @@ exp:
     { Fun1($2, $4) }
 | exp actual_args
     { App($1, $2) }
+| CCALL IDENT actual_args
+    { CCall($2, $3)}
 | exp PLUS exp
     { Plus($1, $3) }
 | exp SUB exp

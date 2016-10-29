@@ -3,7 +3,7 @@ type t =
   | Bool of bool
   | String of string
   | MakeTuple of int * int
-  | Prim of string * int
+  | CCall of int
   | StackAccess of int
   | EnvAccess of int
   | Closure of t list

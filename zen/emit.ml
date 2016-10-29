@@ -151,7 +151,7 @@ let rec emit_inst buf x =
     o_uint32 buf n;
     buffer_append buf {data=(Bytes.of_string s); pos=n};
     o_byte buf (char_of_int 0)
-  | Instruct.Prim (str,n) ->
+  | Instruct.CCall n ->
     o buf idCCALL;
     o_uint32 buf n
 let emit buf bc =

@@ -29,7 +29,10 @@ main(int argc, char* argv[]) {
   }
 
   struct VM* vm = vm_new(4000);
-  vm_load(vm, "runtime/std.dylib");
+  if (vm_load(vm, "runtime/std.dylib") != 0) {
+    printf("load stdlib error");
+    return -1;
+  }
 
   value res = vm_run(vm, buf);
   print_value(res);
