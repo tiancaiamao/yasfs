@@ -1,6 +1,7 @@
 type t =
     Int of int
   | Bool of bool
+  | String of string
   | Var of int
   | Tuple of int * t list
   | App of t * t list

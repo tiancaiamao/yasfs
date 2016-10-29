@@ -1,8 +1,9 @@
 type t =
     Const of int
   | Bool of bool
+  | String of string
   | MakeTuple of int * int
-  | Prim of string
+  | Prim of string * int
   | StackAccess of int
   | EnvAccess of int
   | Closure of t list

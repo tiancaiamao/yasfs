@@ -1,6 +1,7 @@
 let rec compile exp code threshold = match exp with
     Lambda.Int v -> (Instruct.Const v)::code
   | Lambda.Bool v -> (Instruct.Bool v)::code
+  | Lambda.String s -> (Instruct.String s)::code
   | Lambda.Tuple (tag, vs) ->
     let n = (List.length vs) in
     if n = 0 then Instruct.MakeTuple (tag, 0)::code else
@@ -23,7 +24,7 @@ let rec compile exp code threshold = match exp with
   | Lambda.Switch (t, cases) ->
     compile t [Instruct.Switch
                  (List.map (fun (i, x) -> (i, (compile x code threshold))) cases)] threshold
-  | Lambda.Prim s -> (Instruct.Prim s)::code
+  | Lambda.Prim s -> (Instruct.Prim (s,0))::code
   | Lambda.Plus (a, b) ->
     compile a (Instruct.Push::(compile b (Instruct.Plus::code)) threshold) threshold
   | Lambda.Sub (a, b) ->
@@ -39,7 +40,8 @@ let rec compile exp code threshold = match exp with
 and compile_tail exp threshold = match exp with
     Lambda.Int v -> [Instruct.Const v; Instruct.Return]
   | Lambda.Bool v -> [Instruct.Bool v; Instruct.Return]
-  | Lambda.Prim s -> [Instruct.Prim s; Instruct.Return]
+  | Lambda.String s -> [Instruct.String s; Instruct.Return]
+  | Lambda.Prim s -> [Instruct.Prim (s,0); Instruct.Return]
   | Lambda.Var n -> if n < threshold
     then [Instruct.StackAccess n; Instruct.Return]
     else [Instruct.EnvAccess (n-threshold); Instruct.Return]

@@ -19,6 +19,9 @@ let idDIVINT  = 18
 let idMAKEBLOCK = 19
 let idGETFIELD = 20
 let idSWITCH  = 21
+let idCCALL   = 22
+let idSTRING   = 23
+
 
 type buffer = {mutable data: bytes; mutable pos: int};;
 
@@ -142,7 +145,15 @@ let rec emit_inst buf x =
         o_uint32 buf i;
         o_uint32 buf v.pos) ii ll;
     List.iter (buffer_append buf) ll
-
+  | Instruct.String s ->
+    let n = String.length s in
+    o buf idSTRING;
+    o_uint32 buf n;
+    buffer_append buf {data=(Bytes.of_string s); pos=n};
+    o_byte buf (char_of_int 0)
+  | Instruct.Prim (str,n) ->
+    o buf idCCALL;
+    o_uint32 buf n
 let emit buf bc =
   List.iter (emit_inst buf) bc;
   Bytes.sub buf.data 0 buf.pos

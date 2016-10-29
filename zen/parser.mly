@@ -15,6 +15,7 @@
 %token KwUNIT
 %token <int> INT
 %token <string> IDENT
+%token QUOTATION
 %token PLUS
 %token MUL
 %token SUB
@@ -71,6 +72,8 @@ simple_exp:
     { Bool(true) }
 | FALSE
     { Bool(false) }
+| QUOTATION IDENT QUOTATION
+    { String($2) }
 | SHARP IDENT LPAREN RPAREN
     { Tuple (Some $2, []) }
 | SHARP IDENT LPAREN exp RPAREN

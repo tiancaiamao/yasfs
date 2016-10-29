@@ -23,6 +23,8 @@ enum{
   MAKEBLOCK = 19,
   GETFIELD = 20,
   SWITCH  = 21,
+  CCALL   = 22,
+  STRING  = 23,
 };
 
 #endif

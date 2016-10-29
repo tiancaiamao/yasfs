@@ -29,8 +29,11 @@ main(int argc, char* argv[]) {
   }
 
   struct VM* vm = vm_new(4000);
+  vm_load(vm, "runtime/std.dylib");
+
   value res = vm_run(vm, buf);
   print_value(res);
 
+  vm_close(vm);
   return 0;
 }

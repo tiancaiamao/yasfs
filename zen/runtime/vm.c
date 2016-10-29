@@ -1,17 +1,23 @@
 #include "value.h"
+#include "vm.h"
 #include "instruct.h"
 #include "util.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <dlfcn.h>
+
+static value c_call(struct VM* vm, void *fn, int n);
 
 struct VM {
-  int pc;
-  int sp;
-  int bp; // bp is not saved to stack
-  int mark;
-  value acc;
+  int pc;	// pc register
+  int sp;	// sp register
+  int bp;	// bp is not saved to stack
+  int mark;	// return point register
+  value acc;	// acc register
   value* stack;
-  value env;
+  value env; // env register
+
+  void *handle; // dll handle
 };
 
 static void
@@ -32,6 +38,27 @@ vm_new(int sz) {
   vm_init(vm, sz);
   return vm;
 }
+
+int
+vm_load(struct VM* vm, char *dylib_path) {
+  void* handle = dlopen(dylib_path, RTLD_GLOBAL | RTLD_NOW);
+  if (handle == NULL) {
+    return -1;
+  }
+  vm->handle = handle;
+  return 0;
+}
+
+void
+vm_close(struct VM* vm) {
+  if (vm->handle != NULL) {
+    dlclose(vm->handle);
+    vm->handle = NULL;
+  }
+  free(vm->stack);
+  free(vm);
+}
+
 
 value
 vm_run(struct VM* vm, char* code) {
@@ -233,7 +260,74 @@ vm_run(struct VM* vm, char* code) {
         vm->pc = vm->pc+5+8*n+ofst;
       }
       break;
+    case CCALL:
+      {
+        uint32_t n = read_uint32(&code[vm->pc+1]);
+        char *prim = value_string(vm->acc);
+        void *fn_ptr = dlsym(vm->handle, prim);
+        if (fn_ptr == NULL) {
+          // TODO check
+        }
+        vm->acc = c_call(vm, fn_ptr, n);
+        vm->sp -= (n-1);
+        vm->pc += 5;
+      }
+      break;
+    case STRING:
+      {
+        uint32_t n = read_uint32(&code[vm->pc+1]);
+        vm->acc = new_string(&code[vm->pc+5], n);
+        vm->pc += 5+n+1;
+      }
     }
   }
   return vm->acc;
+}
+
+static value
+c_call(struct VM* vm, void *ptr, int n) {
+  switch (n) {
+  case 0:
+    {
+      value (*fn_ptr)() = ptr;
+      return fn_ptr();
+    }
+  case 1:
+    {
+      value (*fn_ptr)(value) = ptr;
+      return fn_ptr(vm->stack[vm->sp-1]);
+    }
+  case 2:
+    {
+      value (*fn_ptr)(value, value) = ptr;
+      return fn_ptr(vm->stack[vm->sp-1], vm->stack[vm->sp-2]);
+    }
+  case 3:
+    {
+      value (*fn_ptr)(value,value,value) = ptr;
+      return fn_ptr(vm->stack[vm->sp-1], vm->stack[vm->sp-2],
+                    vm->stack[vm->sp-3]);
+    }
+  case 4:
+    {
+      value (*fn_ptr)(value,value,value, value) = ptr;
+      return fn_ptr(vm->stack[vm->sp-1], vm->stack[vm->sp-2],
+                    vm->stack[vm->sp-3], vm->stack[vm->sp-4]);
+    }
+  case 5:
+    {
+      value (*fn_ptr)(value,value,value,value,value) = ptr;
+      return fn_ptr(vm->stack[vm->sp-1],vm->stack[vm->sp-2],
+                    vm->stack[vm->sp-3],vm->stack[vm->sp-4],
+                    vm->stack[vm->sp-5]);
+    }
+  case 6:
+    {
+      value (*fn_ptr)(value,value,value,value,value,value) = ptr;
+      return fn_ptr(vm->stack[vm->sp-1],vm->stack[vm->sp-2],
+                    vm->stack[vm->sp-3],vm->stack[vm->sp-4],
+                    vm->stack[vm->sp-5],vm->stack[vm->sp-6]);
+    }
+  }
+  return value_unit;
 }

@@ -21,6 +21,7 @@ enum {
   tag_tuple,
   tag_closure,
   tag_string,
+  tag_userdata,
   tag_env,
 };
 
@@ -53,6 +54,12 @@ struct Tuple {
   uint32_t tag;
   uint32_t size;
   value data[0];
+};
+
+struct String {
+  struct block_head head;
+  uint32_t size;
+  char *ptr; // string is immutable, ptr may point to code!
 };
 
 static value
@@ -187,4 +194,18 @@ value_mul(value a, value b) {
 value
 value_div(value a, value b) {
   return (((a>>1) / (b>>1)) << 1) | 1;
+}
+
+value
+new_string(char *p, int n) {
+  value b = block_alloc(3, tag_string);
+  struct String* s = (struct String*)b;
+  s->ptr = p;
+  s->size = n;
+  return b;
+}
+
+char *
+value_string(value v) {
+  return ((struct String*)v)->ptr;
 }

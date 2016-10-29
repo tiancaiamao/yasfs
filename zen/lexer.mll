@@ -25,6 +25,8 @@ rule token = parse
     { SEMICOLON }
 | digit+
     { INT(int_of_string (Lexing.lexeme lexbuf)) }
+| '"'
+    {QUOTATION}
 | '+'
     { PLUS }
 | '-'

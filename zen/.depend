@@ -11,8 +11,8 @@ driver.cmx : zinc.cmx parser.cmx lexer.cmx instruct.cmx infer.cmx emit.cmx \
     bruijn.cmx
 driver_test.cmo : zinc.cmo driver.cmo
 driver_test.cmx : zinc.cmx driver.cmx
-emit.cmo : instruct.cmo
-emit.cmx : instruct.cmx
+emit.cmo :
+emit.cmx :
 global.cmo :
 global.cmx :
 infer.cmo : type.cmo global.cmo ast.cmo

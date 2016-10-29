@@ -27,11 +27,13 @@ value closure_env(value cls);
 void closure_set_env(value cls, value env);
 void closure_set_pc(value cls, int pc);
 
+value new_string(char *pc, int n);
+char* value_string(value v);
+
 value value_add(value v1, value v2);
 value value_sub(value v1, value v2);
 value value_mul(value v1, value v2);
 value value_div(value v1, value v2);
-
 
 value new_tuple(uint32_t tag, uint32_t size);
 void tuple_set(value tu, int i, value v);
