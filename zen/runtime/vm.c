@@ -2,9 +2,10 @@
 #include "vm.h"
 #include "instruct.h"
 #include "util.h"
+#include "dylib.h"
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
-#include <dlfcn.h>
 
 static value c_call(struct VM* vm, void *fn, int n);
 
@@ -17,7 +18,7 @@ struct VM {
   value* stack;
   value env; // env register
 
-  void *handle; // dll handle
+  struct Handle *handle; // dylib handle
 };
 
 static void
@@ -39,22 +40,9 @@ vm_new(int sz) {
   return vm;
 }
 
-int
-vm_load(struct VM* vm, char *dylib_path) {
-  void* handle = dlopen(dylib_path, RTLD_GLOBAL | RTLD_NOW);
-  if (handle == NULL) {
-    return -1;
-  }
-  vm->handle = handle;
-  return 0;
-}
-
 void
 vm_close(struct VM* vm) {
-  if (vm->handle != NULL) {
-    dlclose(vm->handle);
-    vm->handle = NULL;
-  }
+  handle_destroy(vm->handle);
   free(vm->stack);
   free(vm);
 }
@@ -263,9 +251,20 @@ vm_run(struct VM* vm, char* code) {
     case CCALL:
       {
         uint32_t n = read_uint32(&code[vm->pc+1]);
-        printf("CCALL: n=%d\n", n);
-        char *prim = value_string(vm->acc);
-        void *fn_ptr = dlsym(vm->handle, prim);
+        char *str = value_string(vm->acc);
+        char *prim = strchr(str, '.');
+        if (prim == NULL) {
+          // TODO
+        }
+        int len = prim-str;
+        char *dylib = alloca(len+1);
+        memcpy(dylib, str, len);
+        dylib[len] = 0;
+        prim++;
+
+        printf("CCALL: n=%d %s %s\n", n, prim, dylib);
+
+        void *fn_ptr = handle_get(vm->handle, prim, dylib);
         if (fn_ptr == NULL) {
           // TODO check
         }

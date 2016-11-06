@@ -17,9 +17,12 @@ OBJS = type.cmo ast.cmo global.cmo lambda.cmo instruct.cmo lexer.cmo parser.cmo 
 
 DEPEND += lexer.ml parser.ml parser.mli
 
-all: .depend lib
+all: .depend lib vm
 
 include .depend
+
+vm:
+	gcc -I runtime -o vm main.c runtime/dylib.c runtime/util.c runtime/value.c runtime/vm.c
 
 lib: zen.cma
 
@@ -41,7 +44,7 @@ bruijn_test: zen.cma
 	ocaml zen.cma bruijn_test.ml
 
 clean:
-	rm -rf parser.ml parser.mli lexer.ml *.cmo *.cmi *.cma
+	rm -rf parser.ml parser.mli lexer.ml *.cmo *.cmi *.cma runtime/*.o vm
 
 .depend: $(DEPEND)
 	ocamldep $(INCLUDE) *.mli *.ml > .depend
