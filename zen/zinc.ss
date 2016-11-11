@@ -8,12 +8,15 @@
 (define (IApply) (tuple IApply))
 (define (IClosure code) (tuple IClosure code))
 (define (IPushRetAddr code) (tuple IPushRetAddr code))
+(define (IConst v) (tuple IConst v))
+(define (IBool v) (tuple IBool v))
+(define (IString v) (tuple IString v))
 
 (define (compile exp code threshold)
   (case exp
-    (Int (cons exp code))
-    (Bool (cons exp code))
-    (String (cons exp code))
+    (Int (cons (IConst (field 0 exp)) code))
+    (Bool (cons (IBool (field 0 exp)) code))
+    (String (cons (IString (field 0 exp)) code))
     (Var
      (let ((n (Var&s exp)))
        (if (< n threshold)

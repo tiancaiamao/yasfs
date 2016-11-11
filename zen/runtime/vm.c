@@ -30,6 +30,7 @@ vm_init(struct VM* vm, int size) {
   vm->acc = value_unit;
   vm->stack = (value*)malloc(sizeof(value)*size);
   vm->env = (value)NULL;
+  vm->handle = handle_create();
   return;
 }
 

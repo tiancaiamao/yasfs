@@ -22,7 +22,7 @@ all: .depend lib vm
 include .depend
 
 vm:
-	gcc -I runtime -o vm main.c runtime/dylib.c runtime/util.c runtime/value.c runtime/vm.c
+	gcc -g -I runtime -o vm main.c runtime/dylib.c runtime/util.c runtime/value.c runtime/vm.c
 
 lib: zen.cma
 
