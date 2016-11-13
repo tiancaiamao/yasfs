@@ -349,3 +349,8 @@ int f(luaState *s)
 这个版本做FFI
 下个版本重做Gramma和Parse部分，采用sexp
 
+## 控制流
+
+call/cc没有多少实用价值，实现起来复杂，使用起来难以理解。
+
+reset/shift实现应该不难，比较有价值

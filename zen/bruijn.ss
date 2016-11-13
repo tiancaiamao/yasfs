@@ -50,4 +50,7 @@
     (If (If (ast2lambda env (field 0 ast))
             (ast2lambda env (field 1 ast))
             (ast2lambda env (field 2 ast))))
+    (Equal
+     (Equal (ast2lambda env (field 0 ast))
+            (ast2lambda env (field 1 ast))))
     ))

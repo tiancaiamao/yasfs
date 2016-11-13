@@ -52,6 +52,7 @@
     (ISub (put-u8 p idSUBINT))
     (IMul (put-u8 p idMULINT))
     (IDiv (put-u8 p idDIVINT))
+    (IEqual (put-u8 p idEQ))
     (IReturn (put-u8 p idRETURN))
     (IClosure
      (let-values (((op g) (open-bytevector-output-port)))
