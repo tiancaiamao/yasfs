@@ -31,6 +31,10 @@
      (let ((n (field 0 exp))
            (ts (field 1 exp)))
        (cons (IClosure (compile-tail exp n)) code)))
+    (Fun1
+     (let ((n (field 0 exp))
+           (ts (field 1 exp)))
+       (cons (IClosure (compile-tail exp n)) code)))
     (App
      (cons (IPushRetAddr code) (compile-tail exp threshold)))
     (Plus
@@ -105,6 +109,12 @@
     (Fun (let ((n (field 0 exp))
                (ts (field 1 exp)))
            (cons (IGrab n) (compile-body ts n))))
+    (Fun1 (let ((n (field 0 exp))
+                (ts (field 1 exp)))
+            (append
+             (cons (IGrab (- n 1))
+                   (cons (IPush) (compile-body ts n)))
+             (cons (IReturn) '()))))
     (App (let ((t (field 0 exp))
                (ts (field 1 exp)))
            (let ((init (compile t (cons (IApply) '()) threshold))

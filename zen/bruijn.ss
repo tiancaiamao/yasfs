@@ -28,6 +28,15 @@
                    (lambda (v)
                      (ast2lambda e v)))))
          (Fun len (map (fn new-env) ts)))))
+    (Fun1
+     (let ((args (field 0 ast))
+           (ts (field 1 ast)))
+       (let ((len (length args))
+             (new-env (extend-env env args))
+             (fn (lambda (e)
+                   (lambda (v)
+                     (ast2lambda e v)))))
+         (Fun1 len (map (fn new-env) ts)))))
     (Var (Var (find-env env (Var&s ast))))
     (App (App
           (ast2lambda env (App&t ast))
