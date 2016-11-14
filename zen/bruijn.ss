@@ -19,6 +19,15 @@
     (Bool ast)
     (Int ast)
     (String ast)
+    (Tuple
+     (let ((tag (if (eq? (field 0 ast) '_)
+                    0
+                    (name-to-tag (field 0 ast))))
+           (ls (map (lambda (x) (ast2lambda env x))
+                    (field 1 ast))))
+       (Tuple tag ls)))
+    (Field
+     (Field (field 0 ast) (ast2lambda env (field 1 ast))))
     (Fun
      (let ((args (field 0 ast))
            (ts (field 1 ast)))

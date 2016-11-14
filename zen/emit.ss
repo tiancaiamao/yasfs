@@ -94,4 +94,11 @@
          (put-u32 p (bytevector-length bv1))
          (put-bytevector p bv1))))
     (IEqual (put-u8 p idEQ))
+    (IMakeTuple
+     (begin (put-u8 p idMAKEBLOCK)
+            (put-u32 p (field 0 x))
+            (put-u32 p (field 1 x))))
+    (IField
+     (begin (put-u8 p idGETFIELD)
+            (put-u32 p (field 0 x))))
     ))

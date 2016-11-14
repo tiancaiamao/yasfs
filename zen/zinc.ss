@@ -15,7 +15,9 @@
 (define (IConst v) (tuple IConst v))
 (define (IBool v) (tuple IBool v))
 (define (IString v) (tuple IString v))
+(define (IField i) (tuple IField i))
 (define (IBranch then else) (tuple IBranch then else))
+(define (IMakeTuple tag size) (tuple IMakeTuple tag size))
 
 (define (compile exp code threshold)
   (case exp
@@ -91,7 +93,23 @@
     (If
      (compile (field 0 exp)
               (cons (IBranch (compile (field 1 exp) code threshold)
-                       (compile (field 2 exp) code threshold)) '())
+                             (compile (field 2 exp) code threshold)) '())
+              threshold))
+    (Tuple
+     (let ((tag (field 0 exp))
+           (vs (field 1 exp))
+           (n (length (field 1 exp))))
+       (if (= n 0)
+           (cons (IMakeTuple tag 0) code)
+           (let ((fn (lambda (a b)
+                       (compile b (cons (IPush) a) threshold)))
+                 (init (compile (car vs)
+                                (cons (IMakeTuple tag n) code)
+                                threshold)))
+             (fold-left fn init (cdr vs))))))
+    (Field
+     (compile (field 1 exp)
+              (cons (IField (field 0 exp)) code)
               threshold))
     ))
 
@@ -106,6 +124,8 @@
     (Mul (compile exp (cons (IReturn) '()) threshold))
     (Div (compile exp (cons (IReturn) '()) threshold))
     (Equal (compile exp (cons (IReturn) '()) threshold))
+    (Tuple (compile exp (cons (IReturn) '()) threshold))
+    (Field (compile exp (cons (IReturn) '()) threshold))
     (Fun (let ((n (field 0 exp))
                (ts (field 1 exp)))
            (cons (IGrab n) (compile-body ts n))))
