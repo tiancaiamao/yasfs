@@ -18,6 +18,7 @@
 (define (Tuple&tag t) (case t (Tuple (field 0 t))))
 (define (Tuple&ls t) (case t (Tuple (field 1 t))))
 (define (Field n t) (tuple Field n t))
+(define (Switch t ls) (tuple Switch t ls))
 
 (define (parse exp)
   (if (pair? exp)
@@ -55,4 +56,9 @@
       (Tuple (car tl) (map parse (cdr tl))))
      ((eq? hd '=)
       (Equal (parse (car tl)) (parse (cadr tl))))
+     ((eq? hd 'case)
+      (Switch (parse (car tl))
+              (map (lambda (x)
+                     (cons (car x) (parse (cadr x))))
+                   (cdr tl))))
      (#t (App (parse hd) (map parse tl))))))

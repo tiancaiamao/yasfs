@@ -14,6 +14,18 @@
 
 (define empty-env (lambda () '()))
 
+(define name2tag
+  (let ((count 0)
+        (ht (make-hashtable symbol-hash eq?)))
+    (lambda (name)
+      (let ((find (symbol-hashtable-ref ht name -1)))
+        (if (= find -1)
+            (begin
+              (set! count (+ count 1))
+              (symbol-hashtable-set! ht name count)
+              count)
+            find)))))
+
 (define (ast2lambda env ast)
   (case ast
     (Bool ast)
@@ -22,7 +34,7 @@
     (Tuple
      (let ((tag (if (eq? (field 0 ast) '_)
                     0
-                    (name-to-tag (field 0 ast))))
+                    (name2tag (field 0 ast))))
            (ls (map (lambda (x) (ast2lambda env x))
                     (field 1 ast))))
        (Tuple tag ls)))
@@ -71,4 +83,10 @@
     (Equal
      (Equal (ast2lambda env (field 0 ast))
             (ast2lambda env (field 1 ast))))
+    (Switch
+     (let ((fn (lambda (x)
+                 (cons (name2tag (car x))
+                       (ast2lambda env (cdr x))))))
+       (Switch (ast2lambda env (field 0 ast))
+               (map fn (field 1 ast)))))
     ))

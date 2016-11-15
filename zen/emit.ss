@@ -38,6 +38,37 @@
     (put-u32 p v0)
     (put-u32 p v1)))
 
+(define (ByteBuffer op g) (tuple ByteBuffer op g))
+(define (ByteBuffer.op x)
+  (case x (ByteBuffer (field 0 x))))
+(define (ByteBuffer.g x)
+  (case x (ByteBuffer (field 1 x))))
+(define (ByteBuffer->bytevector x) ((ByteBuffer.g x)))
+
+;; 接受一个inst的列表，将它们全部emit后放到一块buffer，并不关闭
+(define (emit-inst-list ls)
+  (let-values (((op g) (open-bytevector-output-port)))
+    (for-each
+     (lambda (x)
+       (emit-inst op x))
+     ls)
+    (ByteBuffer op g)))
+
+;; 将ByteBuffer列表转化成bytevector列表，并且在里面插入该跳转的偏移
+(define (fnbuf l)
+  (define (loop ls)
+    (if (null? ls) 0
+        (if (null? (cdr ls))
+            (port-output-size (ByteBuffer.op (car ls)))
+            (let ((ofst (loop (cdr ls)))
+                  (p (ByteBuffer.op (car ls))))
+              (put-u8 p idBRANCH)
+              (put-u32 p ofst)
+              (+ ofst (port-output-size p))))))
+  (loop l)
+  (map ByteBuffer->bytevector l))
+
+
 (define (emit-inst p x)
   (case x
     (IConst
@@ -101,4 +132,20 @@
     (IField
      (begin (put-u8 p idGETFIELD)
             (put-u32 p (field 0 x))))
+    (ISwitch
+     (let ((l (field 0 x)))
+       (let ((ii (map car l))
+             (tt (map cdr l)))
+         (let ((ll (fnbuf (map emit-inst-list tt))))
+           (put-u8 p idSWITCH)
+           (put-u32 p (length ll))
+           (for-each
+            (lambda (i v)
+              (put-u32 p i)
+              (put-u32 p (bytevector-length v)))
+            ii ll)
+           (for-each
+            (lambda (v)
+              (put-bytevector p v))
+            ll)))))
     ))

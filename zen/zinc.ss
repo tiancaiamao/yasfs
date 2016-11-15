@@ -18,6 +18,7 @@
 (define (IField i) (tuple IField i))
 (define (IBranch then else) (tuple IBranch then else))
 (define (IMakeTuple tag size) (tuple IMakeTuple tag size))
+(define (ISwitch ls) (tuple ISwitch ls))
 
 (define (compile exp code threshold)
   (case exp
@@ -111,6 +112,14 @@
      (compile (field 1 exp)
               (cons (IField (field 0 exp)) code)
               threshold))
+    (Switch
+     (let ((fn (lambda (x)
+                 (cons (car x)
+                       (compile (cdr x) code threshold)))))
+       (compile (field 0 exp)
+                (cons (ISwitch
+                       (map fn (field 1 exp))) '())
+                threshold)))
     ))
 
 (define (compile-tail exp threshold)
@@ -126,6 +135,7 @@
     (Equal (compile exp (cons (IReturn) '()) threshold))
     (Tuple (compile exp (cons (IReturn) '()) threshold))
     (Field (compile exp (cons (IReturn) '()) threshold))
+    (Switch (compile exp (cons (IReturn) '()) threshold))
     (Fun (let ((n (field 0 exp))
                (ts (field 1 exp)))
            (cons (IGrab n) (compile-body ts n))))

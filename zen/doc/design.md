@@ -349,6 +349,16 @@ int f(luaState *s)
 这个版本做FFI
 下个版本重做Gramma和Parse部分，采用sexp
 
+全部统一成
+lambda (参数列表) (局部变量列表) body
+整个文件假定套在一个(lambda () ...)里面
+(define a 3)
+(define (add x y) (+ x y)) 变成
+(lambda () (a add)
+  (set! a 3)
+  (set! add (lambda (x y) () (+ x y))))
+
+
 ## 控制流
 
 call/cc没有多少实用价值，实现起来复杂，使用起来难以理解。
