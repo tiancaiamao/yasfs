@@ -152,15 +152,11 @@
               (put-bytevector p v))
             ll)))))
     (ILet
-     (let ((n (field 0 x))
-           (ts (field 1 x)))
-       (let-values (((op g) (open-bytevector-output-port)))
-         (for-each (lambda (x) (emit-inst op x)) ts)
-         (put-u8 p idLET)
-         (put-u8 p n)
-         (put-bytevector p (g))
-         (put-u8 p idENDLET)
-         (put-u8 p n))))
+     (begin (put-u8 p idLET)
+            (put-u8 p (field 0 x))))
+    (IEndLet
+     (begin (put-u8 p idENDLET)
+            (put-u8 p (field 0 x))))
     (ISet
      (begin (put-u8 p idASSIGN)
             (put-u8 p (field 0 x))))

@@ -67,7 +67,7 @@
        (Let (length arg-list)
             (map
              (lambda (x)
-               (ast2lambda (append env arg-list) x))
+               (ast2lambda (extend-env env arg-list) x))
              body))))
     (App (App
           (ast2lambda env (App&t ast))

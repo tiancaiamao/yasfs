@@ -19,7 +19,8 @@
 (define (IBranch then else) (tuple IBranch then else))
 (define (IMakeTuple tag size) (tuple IMakeTuple tag size))
 (define (ISwitch ls) (tuple ISwitch ls))
-(define (ILet n ts) (tuple ILet n ts))
+(define (ILet n) (tuple ILet n))
+(define (IEndLet n) (tuple IEndLet n))
 (define (ISet n) (tuple ISet n))
 
 (define (compile exp code threshold)
@@ -43,12 +44,12 @@
     (Let
      (let ((n (field 0 exp))
            (ts (field 1 exp)))
-       (cons
-        (ILet n (fold-left (lambda (o x)
-                  (compile x o (+ threshold n)))
-                '()
-                (reverse ts)))
-        code)))
+       (cons (ILet n)
+             (fold-left
+              (lambda (o x)
+                (compile x o (+ threshold n)))
+              (cons (IEndLet n) code)
+              (reverse ts)))))
     (Set
      (compile (field 1 exp)
               (cons (ISet (field 0 exp)) code)

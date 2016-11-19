@@ -386,3 +386,7 @@ g h i在bruijn变换之后index就是6 7 8
 
 IR添加#Let(n, ...)
 指令集添加LET ENDLET ASSIGN
+
+## 参数执行顺序
+
+从右向左

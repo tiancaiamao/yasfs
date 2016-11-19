@@ -16,7 +16,8 @@ struct VM {
   int mark;	// return point register
   value acc;	// acc register
   value* stack;
-  value env; // env register
+  value* env;
+  int pos; // env register
 
   struct Handle *handle; // dylib handle
 };
