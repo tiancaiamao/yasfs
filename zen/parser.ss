@@ -19,6 +19,8 @@
 (define (Tuple&ls t) (case t (Tuple (field 1 t))))
 (define (Field n t) (tuple Field n t))
 (define (Switch t ls) (tuple Switch t ls))
+(define (Set v t) (tuple Set v t))
+(define (Let ls ts) (tuple Let ls ts))
 
 (define (parse exp)
   (if (pair? exp)
@@ -61,4 +63,13 @@
               (map (lambda (x)
                      (cons (car x) (parse (cadr x))))
                    (cdr tl))))
+     ((eq? hd 'let)
+      (let ((arg-list (map car (car tl)))
+            (header (map
+                     (lambda (x)
+                       (Set (car x)
+                            (parse (cadr x))))
+                     (car tl)))
+            (body (map parse (cdr tl))))
+        (Let arg-list (append header body))))
      (#t (App (parse hd) (map parse tl))))))

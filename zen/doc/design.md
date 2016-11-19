@@ -364,3 +364,25 @@ lambda (参数列表) (局部变量列表) body
 call/cc没有多少实用价值，实现起来复杂，使用起来难以理解。
 
 reset/shift实现应该不难，比较有价值
+
+## 局部变量
+
+(lambda (a b c)
+  (lambda (d e f)
+     (let ((g h i))
+       xxx
+      
+parser阶段，let的列表
+bruijn阶段，把顺序变换一下
+
+let之前的环境是
+f e d (c b a)
+
+let之后的环境是
+(f e d (c b a)) g h i
+不是放在前面，而是放在后面的...出来就去掉了
+
+g h i在bruijn变换之后index就是6 7 8
+
+IR添加#Let(n, ...)
+指令集添加LET ENDLET ASSIGN

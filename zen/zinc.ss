@@ -19,6 +19,8 @@
 (define (IBranch then else) (tuple IBranch then else))
 (define (IMakeTuple tag size) (tuple IMakeTuple tag size))
 (define (ISwitch ls) (tuple ISwitch ls))
+(define (ILet n ts) (tuple ILet n ts))
+(define (ISet n) (tuple ISet n))
 
 (define (compile exp code threshold)
   (case exp
@@ -38,6 +40,19 @@
      (let ((n (field 0 exp))
            (ts (field 1 exp)))
        (cons (IClosure (compile-tail exp n)) code)))
+    (Let
+     (let ((n (field 0 exp))
+           (ts (field 1 exp)))
+       (cons
+        (ILet n (fold-left (lambda (o x)
+                  (compile x o (+ threshold n)))
+                '()
+                (reverse ts)))
+        code)))
+    (Set
+     (compile (field 1 exp)
+              (cons (ISet (field 0 exp)) code)
+              threshold))
     (App
      (cons (IPushRetAddr code) (compile-tail exp threshold)))
     (Plus
@@ -136,6 +151,8 @@
     (Tuple (compile exp (cons (IReturn) '()) threshold))
     (Field (compile exp (cons (IReturn) '()) threshold))
     (Switch (compile exp (cons (IReturn) '()) threshold))
+    (Let (compile exp (cons (IReturn) '()) threshold))
+    (Set (compile exp (cons (IReturn) '()) threshold))
     (Fun (let ((n (field 0 exp))
                (ts (field 1 exp)))
            (cons (IGrab n) (compile-body ts n))))

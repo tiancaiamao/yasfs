@@ -1,7 +1,7 @@
 #ifndef _INSTRUCT_H
 #define _INSTRUCT_H
 
-enum{
+enum {
   STOP    = 1,
   PUSHADDR = 2,
   CONST   = 3,
@@ -25,6 +25,9 @@ enum{
   SWITCH  = 21,
   CCALL   = 22,
   STRING  = 23,
+  ASSIGN  = 24,
+  LET     = 25,
+  ENDLET  = 26,
 };
 
 #endif

@@ -135,6 +135,23 @@ vm_run(struct VM* vm, char* code) {
         printf("STACKACC: %d, bp=%d\n", n, vm->bp);
       }
       break;
+    case ASSIGN:
+      {
+        int n = code[vm->pc+1];
+        vm->stack[vm->bp+n] = vm->acc;
+        vm->pc += 2;
+        vm->acc = value_unit;
+        printf("ASSIGN: %d\n", n);
+      }
+      break;
+    case LET:
+      vm->sp += code[vm->pc+1];
+      vm->pc += 2;
+      break;
+    case ENDLET:
+      vm->sp -= code[vm->pc+1];
+      vm->pc += 2;
+      break;
     case ENVACC:
       {
         int n = code[vm->pc+1];
