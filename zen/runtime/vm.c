@@ -16,8 +16,7 @@ struct VM {
   int mark;	// return point register
   value acc;	// acc register
   value* stack;
-  value* env;
-  int pos; // env register
+  value env; // env register
 
   struct Handle *handle; // dylib handle
 };
@@ -128,6 +127,28 @@ vm_run(struct VM* vm, char* code) {
         vm->pc++;
       }
       break;
+    case LET:
+      {
+        uint8_t n = code[vm->pc+1];
+        printf("LET: %d\n", n);
+        for (int i=vm->sp-1; i>=vm->bp; i--) {
+          vm->stack[i+n] = vm->stack[i];
+        }
+        vm->sp = vm->sp + n;
+        vm->pc += 2;
+      }
+      break;
+    case ENDLET:
+      {
+        uint8_t n = code[vm->pc+1];
+        printf("ENDLET: %d\n", n);
+        for (int i=vm->bp+n; i<vm->sp; i++) {
+          vm->stack[i-n] = vm->stack[i];
+        }
+        vm->sp -= n;
+        vm->pc += 2;
+      }
+      break;
     case STACKACC:
       {
         int n = code[vm->pc+1];
@@ -144,14 +165,6 @@ vm_run(struct VM* vm, char* code) {
         vm->acc = value_unit;
         printf("ASSIGN: %d\n", n);
       }
-      break;
-    case LET:
-      vm->sp += code[vm->pc+1];
-      vm->pc += 2;
-      break;
-    case ENDLET:
-      vm->sp -= code[vm->pc+1];
-      vm->pc += 2;
       break;
     case ENVACC:
       {
