@@ -22,6 +22,130 @@
 (define (Set v t) (tuple Set v t))
 (define (Let ls ts) (tuple Let ls ts))
 
+;; macro0把(define (f x) ...)变成(define f (lambda (x) ...))
+(define (macro0 exp)
+  (if (not (pair? exp)) exp
+      (let ((hd (car exp))
+            (tl (cdr exp)))
+        (cond
+         ((eq? hd 'define)
+          (if (pair? (car tl))
+              (let ((body `(lambda ,(cdar tl) ,@(cdr tl))))
+                `(define ,(caar tl) ,(macro0 body)))
+              `(define ,(car tl) ,@(map macro0 (cdr tl)))))
+         ((eq? hd 'if)
+          `(if ,(macro0 (car tl)) ,(macro0 (cadr tl)) ,(macro0 (caddr tl))))
+         ((eq? hd 'field)
+          `(field ,(car tl) ,(macro0 (cadr tl))))
+         ((eq? hd 'tuple)
+          `(tuple ,(car tl) (map macro0 (cdr tl))))
+         ((eq? hd 'lambda)
+          `(lambda ,(car tl) ,@(map macro0 (cdr tl))))
+         ((eq? hd 'case)
+          `(case ,(macro0 (car tl))
+             ,(map (lambda (x)
+                     (cons (car x) (macro0 (cadr x))))
+                   (cdr tl))))
+         ((eq? hd 'let)
+          `(let ,(car tl) ,@(map macro0 (cdr tl))))
+         ((or (eq? hd '+) (eq? hd '-) (eq? hd '*) (eq? hd '/) (eq? hd '=))
+          `(,hd ,(macro0 (car tl)) ,(macro0 (cadr tl))))
+         (#t `(,(macro0 hd) ,@(map macro0 tl)))))))
+
+
+(define remove
+  (lambda (x ls)
+    (cond
+     ((null? ls) '())
+     ((eq? x (car ls))
+      (remove x (cdr ls)))
+     (else
+      (cons (car ls) (remove x (cdr ls)))))))
+
+(define difference
+  (lambda (lst1 lst2)
+    (if (not (pair? lst2))
+        lst1
+        (difference (remove (car lst2) lst1) (cdr lst2)))))
+
+(define insert
+  (lambda (x ls)
+    (cond
+     ((null? ls) (cons x '()))
+     ((eq? (car ls) x) ls)
+     (else (cons (car ls)
+                 (insert x (cdr ls)))))))
+
+(define union
+  (lambda (lst1 lst2)
+    (if (null? lst1)
+        lst2
+        (insert (car lst1)
+                (union (cdr lst1) lst2)))))
+
+(define reduce
+  (lambda (f ls rv)
+    (if (null? ls)
+        rv
+        (reduce f (cdr ls) (f (car ls) rv)))))
+
+(define free-vars
+  (lambda (exp)
+    (cond
+     ((or (integer? exp) (string? exp)) '())
+     ((symbol? exp)
+      (if (member exp '(tuple switch case = + - * /))
+          '()
+          (list exp)))
+     ((eq? 'if (car exp))
+      (union (free-vars (cadr exp))
+             (union (free-vars (caddr exp))
+                    (free-vars (cadddr exp)))))
+     ((eq? 'lambda (car exp))
+      (difference (free-vars (cddr exp))
+                  (cadr exp)))
+     ((eq? 'define (car exp))
+      (difference  (free-vars (caddr exp))
+                   (list (cadr exp))))
+     (else (reduce union (map free-vars exp) '())))))
+
+;; 把(define f (lambda (x) ...))变成(define f (lambda1 (this x) ...))
+(define (macro1 exp)
+  (if (not (pair? exp)) exp
+      (let ((hd (car exp))
+            (tl (cdr exp)))
+        (cond
+         ((eq? hd 'define)
+          (let ((body (macro1 (cadr tl)))
+                (fv (free-vars (cadr tl))))
+            (if (member (car tl) fv)
+                `(define ,(car tl)
+                   (lambda1 ,(cons (car tl) (cadr body))
+                            ,@(cddr body)))
+                `(define ,(car tl) ,body))))
+         ((eq? hd 'if)
+          `(if ,(macro1 (car tl)) ,(macro1 (cadr tl)) ,(macro1 (caddr tl))))
+         ((eq? hd 'field)
+          `(field ,(car tl) ,(macro1 (cadr tl))))
+         ((eq? hd 'tuple)
+          `(tuple ,(car tl) (map macro1 (cdr tl))))
+         ((eq? hd 'lambda)
+          `(lambda ,(car tl) ,@(map macro1 (cdr tl))))
+         ((eq? hd 'case)
+          `(case ,(macro1 (car tl))
+             ,(map (lambda (x)
+                     (cons (car x) (macro1 (cadr x))))
+                   (cdr tl))))
+         ((eq? hd 'let)
+          `(let ,(car tl) ,@(map macro0 (cdr tl))))
+         ((or (eq? hd '+) (eq? hd '-) (eq? hd '*) (eq? hd '/) (eq? hd '=))
+          `(,hd ,(macro1 (car tl)) ,(macro1 (cadr tl))))
+         (#t `(,(macro1 hd) ,@(map macro1 tl)))))))
+
+;; 把((define f ...) (define g ...) (define h ...) ...)变成
+;; (let ((f ...) (g ...) (h ...)) ...)
+;; (define (parse2 exp))
+
 (define (parse exp)
   (if (pair? exp)
       (parse-sexp exp)

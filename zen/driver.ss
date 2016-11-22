@@ -4,6 +4,11 @@
 (load "zinc.ss")
 (load "emit.ss")
 
+(define (step-parse x)
+  (parse
+   (macro1
+    (macro0 x))))
+
 (define (bruijn ast)
   (ast2lambda (empty-env) ast))
 
