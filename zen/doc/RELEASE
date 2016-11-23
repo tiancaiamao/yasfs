@@ -43,3 +43,12 @@ switch case表达式，用于tuple的tag匹配
 简单的实现了FFI接口
 
 添加了CCALL指令
+
+## v0.0.7
+
+一句话描述：采用S表达式语法
+
+port之前的代码，基于scheme重新实现
+虚拟机添加了let的实现
+添加了一些类似宏展开的预处理
+提供eval-file函数读文件将生成bytecode输出到文件
