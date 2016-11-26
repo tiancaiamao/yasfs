@@ -45,7 +45,7 @@ struct Env {
 
 struct Closure {
   struct block_head head;
-  int pc;
+  int64_t pc;
   struct Env *env;
 };
 
@@ -131,7 +131,7 @@ new_closure(int pc, value env) {
 }
 
 int
-closure_pc(value v) {
+closure_addr(value v) {
   return ((struct Closure*)v)->pc;
 }
 
@@ -146,7 +146,7 @@ closure_set_env(value cls, value env) {
 }
 
 void
-closure_set_pc(value cls, int pc) {
+closure_set_addr(value cls, int64_t pc) {
   ((struct Closure*)cls)->pc = pc;
 }
 

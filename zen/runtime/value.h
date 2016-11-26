@@ -22,10 +22,10 @@ value env_get(value env, int n);
 value env_append(value v, value *ptr, int count);
 
 value new_closure(int pc, value env);
-int closure_pc(value cls);
+int closure_addr(value cls);
 value closure_env(value cls);
 void closure_set_env(value cls, value env);
-void closure_set_pc(value cls, int pc);
+void closure_set_addr(value cls, int64_t addr);
 
 value new_string(char *pc, int n);
 char* value_string(value v);
