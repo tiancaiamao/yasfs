@@ -28,6 +28,7 @@ enum {
   ASSIGN  = 24,
   LET     = 25,
   ENDLET  = 26,
+  LOAD    = 27,
 };
 
 #endif

@@ -22,12 +22,14 @@
 (define (ILet n) (tuple ILet n))
 (define (IEndLet n) (tuple IEndLet n))
 (define (ISet n) (tuple ISet n))
+(define (ILoad) (tuple ILoad))
 
 (define (compile exp code threshold)
   (case exp
     (Int (cons (IConst (field 0 exp)) code))
     (Bool (cons (IBool (field 0 exp)) code))
     (String (cons (IString (field 0 exp)) code))
+    (Load (compile (field 0 exp) (cons (ILoad) code) threshold))
     (Var
      (let ((n (Var&s exp)))
        (if (< n threshold)
@@ -143,6 +145,7 @@
     (Int (compile exp (cons (IReturn) '()) threshold))
     (Bool (compile exp (cons (IReturn) '()) threshold))
     (String (compile exp (cons (IReturn) '()) threshold))
+    (Load (compile exp (cons (IReturn) '()) threshold))
     (Var (compile exp (cons (IReturn) '()) threshold))
     (Plus (compile exp (cons (IReturn) '()) threshold))
     (Sub (compile exp (cons (IReturn) '()) threshold))

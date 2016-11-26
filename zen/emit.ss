@@ -24,6 +24,7 @@
 (define idASSIGN   24)
 (define idLET      25)
 (define idENDLET   26)
+(define idLOAD     27)
 
 (define (put-u32 p u)
   (let ((v0 (bitwise-and u 255))
@@ -71,6 +72,10 @@
   (loop l)
   (map ByteBuffer->bytevector l))
 
+(define (str->bv s)
+  (let ([tx (make-transcoder (utf-8-codec) (eol-style none)
+                             (error-handling-mode raise))])
+    (string->bytevector s tx)))
 
 (define (emit-inst p x)
   (case x
@@ -80,6 +85,13 @@
     (IBool
      (begin (put-u8 p idCONST)
             (put-u64 p (if (field 0 x) 18 34))))
+    (IString
+     (let ((n (string-length (field 0 x))))
+       (put-u8 p idSTRING)
+       (put-u32 p n)
+       (put-bytevector p (str->bv (field 0 x)))
+       (put-u8 p 0)))
+    (ILoad (put-u8 p idLOAD))
     (IStop (put-u8 p idSTOP))
     (IApply (put-u8 p idAPPLY))
     (IPlus (put-u8 p idADDINT))

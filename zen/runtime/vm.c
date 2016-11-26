@@ -70,20 +70,21 @@ addr_module(int64_t addr) {
 
 value
 vm_run(struct VM* vm, char *code) {
-  int module = 0;
-  vm->code[module] = code;
-  vm->cur++;
+  int module = vm->cur;
   int pc = 0;
+  vm->code[vm->cur] = code;
+  vm->addr = make_addr(pc, module);
+  vm->cur++;
 
   while (code[pc] != STOP) {
     switch(code[pc]) {
     case PUSHADDR:
       {
-        int32_t size = read_uint32(&code[vm->addr+1]);
-        printf("PUSHADDR sp=%d mark=%d addr=%lld\n", vm->sp, vm->mark, vm->addr+size+5);
+        int32_t size = read_uint32(&code[pc+1]);
+        printf("PUSHADDR sp=%d mark=%d addr=%d\n", vm->sp, vm->mark, pc+size+5);
         vm->stack[vm->sp] = vm->env;
         vm->sp++;
-        vm->stack[vm->sp] = make_addr(vm->addr+5, module);
+        vm->stack[vm->sp] = vm->addr+5;
         vm->sp++;
         vm->stack[vm->sp] = vm->mark;
         vm->mark = vm->sp;
@@ -93,7 +94,7 @@ vm_run(struct VM* vm, char *code) {
       break;
     case CONST:
       {
-        value v = read_value(&code[vm->addr+1]);
+        value v = read_value(&code[pc+1]);
         printf("CONST %lu\n", v>>1);
         vm->acc = v;
         vm->addr += 9;
@@ -101,7 +102,7 @@ vm_run(struct VM* vm, char *code) {
       break;
     case CLOSURE:
       {
-        int32_t size = read_uint32(&code[vm->addr+1]);
+        int32_t size = read_uint32(&code[pc+1]);
         printf("CLOSURE\n");
         if (vm->bp > 0) {
           value new_env = env_append(vm->env, &vm->stack[vm->bp], vm->sp-vm->bp);
@@ -119,7 +120,7 @@ vm_run(struct VM* vm, char *code) {
       break;
     case GRAB:
       {
-        uint8_t n =  code[vm->addr+1];
+        uint8_t n =  code[pc+1];
         if (vm->sp - vm->mark > n) {
           printf("GRAB: want %d args, have %d args\n", n, vm->sp - vm->mark -1);
           vm->bp = vm->sp-n;
@@ -153,7 +154,7 @@ vm_run(struct VM* vm, char *code) {
       break;
     case LET:
       {
-        uint8_t n = code[vm->addr+1];
+        uint8_t n = code[pc+1];
         printf("LET: %d\n", n);
         for (int i=vm->sp-1; i>=vm->bp; i--) {
           vm->stack[i+n] = vm->stack[i];
@@ -164,7 +165,7 @@ vm_run(struct VM* vm, char *code) {
       break;
     case ENDLET:
       {
-        uint8_t n = code[vm->addr+1];
+        uint8_t n = code[pc+1];
         printf("ENDLET: %d\n", n);
         for (int i=vm->bp+n; i<vm->sp; i++) {
           vm->stack[i-n] = vm->stack[i];
@@ -175,7 +176,7 @@ vm_run(struct VM* vm, char *code) {
       break;
     case STACKACC:
       {
-        int n = code[vm->addr+1];
+        int n = code[pc+1];
         vm->acc = vm->stack[vm->bp+n];
         vm->addr += 2;
         printf("STACKACC: %d, bp=%d\n", n, vm->bp);
@@ -183,7 +184,7 @@ vm_run(struct VM* vm, char *code) {
       break;
     case ASSIGN:
       {
-        int n = code[vm->addr+1];
+        int n = code[pc+1];
         vm->stack[vm->bp+n] = vm->acc;
         vm->addr += 2;
         vm->acc = value_unit;
@@ -192,7 +193,7 @@ vm_run(struct VM* vm, char *code) {
       break;
     case ENVACC:
       {
-        int n = code[vm->addr+1];
+        int n = code[pc+1];
         vm->acc = env_get(vm->env, n);
         vm->addr += 2;
         printf("ENVACC: %d\n", n);
@@ -240,12 +241,12 @@ vm_run(struct VM* vm, char *code) {
       break;
     case RETURN:
       if (vm->bp > vm->mark + 1) {
-        printf("RETURN: more args apply %d sp=%d mark=%d\n", code[vm->addr+1], vm->sp, vm->mark);
+        printf("RETURN: more args apply %d sp=%d mark=%d\n", code[pc+1], vm->sp, vm->mark);
         vm->sp = vm->bp;
         vm->env = closure_env(vm->acc);
         vm->addr = closure_addr(vm->acc);
       } else {
-        printf("RETURN: %d sp=%d mark=%d\n", code[vm->addr+1], vm->sp, vm->mark);
+        printf("RETURN: %d sp=%d mark=%d\n", code[pc+1], vm->sp, vm->mark);
         vm->env = vm->stack[vm->mark-2];
         vm->addr = vm->stack[vm->mark-1];
         vm->sp = vm->mark-2;
@@ -255,12 +256,12 @@ vm_run(struct VM* vm, char *code) {
       break;
     case BRANCH:
       printf("BRANCH\n");
-      vm->addr = vm->addr+5+read_uint32(&code[vm->addr+1]);
+      vm->addr = vm->addr+5+read_uint32(&code[pc+1]);
       break;
     case BRANCHIF:
       if (vm->acc == value_true) {
         printf("BRANCHIF true\n");
-        vm->addr = vm->addr+5+read_uint32(&code[vm->addr+1]);
+        vm->addr = vm->addr+5+read_uint32(&code[pc+1]);
       } else {
         printf("BRANCHIF false\n");
         vm->addr += 5;
@@ -269,8 +270,8 @@ vm_run(struct VM* vm, char *code) {
     case MAKEBLOCK:
       {
         printf("MAKEBLOCK\n");
-        uint32_t tag = read_uint32(&code[vm->addr+1]);
-        uint32_t size = read_uint32(&code[vm->addr+5]);
+        uint32_t tag = read_uint32(&code[pc+1]);
+        uint32_t size = read_uint32(&code[pc+5]);
         value t =  new_tuple(tag, size);
         if (size > 0) {
           tuple_set(t, 0, vm->acc);
@@ -285,17 +286,17 @@ vm_run(struct VM* vm, char *code) {
       break;
     case GETFIELD:
       printf("GETFIELD\n");
-      vm->acc = tuple_get(vm->acc, read_uint32(&code[vm->addr+1]));
+      vm->acc = tuple_get(vm->acc, read_uint32(&code[pc+1]));
       vm->addr += 5;
       break;
     case SWITCH:
       {
         printf("SWITCH\n");
-        uint32_t n = read_uint32(&code[vm->addr+1]);
+        uint32_t n = read_uint32(&code[pc+1]);
         int ofst = 0;
         for (int i=0; i<n; i++) {
-          uint32_t tag = read_uint32(&code[vm->addr+5+i*8]);
-          uint32_t size = read_uint32(&code[vm->addr+9+i*8]);
+          uint32_t tag = read_uint32(&code[pc+5+i*8]);
+          uint32_t size = read_uint32(&code[pc+9+i*8]);
           if (tag == tuple_tag(vm->acc)) {
             break;
           }
@@ -306,7 +307,7 @@ vm_run(struct VM* vm, char *code) {
       break;
     case CCALL:
       {
-        uint32_t n = read_uint32(&code[vm->addr+1]);
+        uint32_t n = read_uint32(&code[pc+1]);
         char *str = value_string(vm->acc);
         char *prim = strchr(str, '.');
         if (prim == NULL) {
@@ -331,19 +332,28 @@ vm_run(struct VM* vm, char *code) {
       break;
     case STRING:
       {
-        uint32_t n = read_uint32(&code[vm->addr+1]);
-        printf("STRING: %s\n", &code[vm->addr+5]);
-        vm->acc = new_string(&code[vm->addr+5], n);
+        uint32_t n = read_uint32(&code[pc+1]);
+        printf("STRING: %s\n", &code[pc+5]);
+        vm->acc = new_string(&code[pc+5], n);
         vm->addr += 5+n+1;
+      }
+      break;
+    case LOAD:
+      {
+        int tmp = vm->sp;
+        int save_addr = vm->addr+1;
+        char* file = value_string(vm->acc);
+        char* code = read_file(file);
+        vm_run(vm, code);
+        printf("LOAD: sp before: %d, after: %d\n", tmp, vm->sp);
+        vm->addr = save_addr;
       }
       break;
     }
 
     pc = addr_pc(vm->addr);
-    if (module != addr_module(vm->addr)) {
-      module = addr_module(vm->addr);
-      code = vm->code[module];
-    }
+    module = addr_module(vm->addr);
+    code = vm->code[module];
   }
   return vm->acc;
 }

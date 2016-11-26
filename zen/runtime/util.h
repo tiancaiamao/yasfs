@@ -7,4 +7,6 @@ uint64_t read_uint64(char *p);
 
 value read_value(char *p);
 
+char* read_file(char *file);
+
 #endif

@@ -45,7 +45,7 @@ struct Env {
 
 struct Closure {
   struct block_head head;
-  int64_t pc;
+  int64_t addr;
   struct Env *env;
 };
 
@@ -122,17 +122,17 @@ env_append(value v, value *ptr, int count) {
 }
 
 value
-new_closure(int pc, value env) {
+new_closure(int64_t addr, value env) {
   value b = block_alloc(3, tag_closure);
   struct Closure* cls = (struct Closure*)b;
-  cls->pc = pc;
+  cls->addr = addr;
   cls->env = (struct Env*)env;
   return b;
 }
 
-int
+int64_t
 closure_addr(value v) {
-  return ((struct Closure*)v)->pc;
+  return ((struct Closure*)v)->addr;
 }
 
 value
@@ -146,8 +146,8 @@ closure_set_env(value cls, value env) {
 }
 
 void
-closure_set_addr(value cls, int64_t pc) {
-  ((struct Closure*)cls)->pc = pc;
+closure_set_addr(value cls, int64_t addr) {
+  ((struct Closure*)cls)->addr = addr;
 }
 
 value

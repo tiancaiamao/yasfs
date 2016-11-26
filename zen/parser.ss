@@ -21,6 +21,7 @@
 (define (Switch t ls) (tuple Switch t ls))
 (define (Set v t) (tuple Set v t))
 (define (Let ls ts) (tuple Let ls ts))
+(define (Load t) (tuple Load t))
 
 ;; macro0把(define (f x) ...)变成(define f (lambda (x) ...))
 (define (macro0 exp)
@@ -205,6 +206,8 @@
       (Mul (parse (car tl)) (parse (cadr tl))))
      ((eq? hd '/)
       (Div (parse (car tl)) (parse (cadr tl))))
+     ((eq? hd 'load)
+      (Load (parse (car tl))))
      ((eq? hd 'field)
       (Field (car tl) (parse (cadr tl))))
      ((eq? hd 'lambda)

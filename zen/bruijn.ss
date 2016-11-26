@@ -31,6 +31,7 @@
     (Bool ast)
     (Int ast)
     (String ast)
+    (Load ast)
     (Tuple
      (let ((tag (if (eq? (field 0 ast) '_)
                     0
