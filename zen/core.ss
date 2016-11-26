@@ -14,20 +14,3 @@
       (else
        ;; if none matched, throw a exception
        (+ 23 "type infer failed")))]))
-
-;; (define (cons a b)
-;;   (tuple Cons a b))
-;; (define (car x)
-;;   (case x
-;;     (Cons (field 0 x))))
-;; (define (cdr x)
-;;   (case x
-;;     (Cons (field 1 x))))
-;; (define nil
-;;   (tuple None))
-
-;; (define map
-;;   (lambda (f l)
-;;     (case l
-;;       (None nil)
-;;       (Cons (cons (f (car l)) (map f (cdr l)))))))
