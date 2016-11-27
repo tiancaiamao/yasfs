@@ -76,6 +76,10 @@
                       (lambda (x)
                         (ast2lambda env x)))))
             (map (fn env) (App&ts ast)))))
+    (CCall (CCall (field 0 ast)
+                  (map (lambda (v)
+                         (ast2lambda env v))
+                       (field 1 ast))))
     (Plus
      (Plus (ast2lambda env (field 0 ast))
            (ast2lambda env (field 1 ast))))

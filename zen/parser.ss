@@ -22,6 +22,7 @@
 (define (Set v t) (tuple Set v t))
 (define (Let ls ts) (tuple Let ls ts))
 (define (Load t) (tuple Load t))
+(define (CCall s ts) (tuple CCall s ts))
 
 ;; macro0把(define (f x) ...)变成(define f (lambda (x) ...))
 (define (macro0 exp)
@@ -232,4 +233,6 @@
                      (car tl)))
             (body (map parse (cdr tl))))
         (Let arg-list (append header body))))
+     ((eq? hd 'ccall)
+      (CCall (car tl) (map parse (cdr tl))))
      (#t (App (parse hd) (map parse tl))))))

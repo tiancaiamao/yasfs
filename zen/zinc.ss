@@ -23,6 +23,7 @@
 (define (IEndLet n) (tuple IEndLet n))
 (define (ISet n) (tuple ISet n))
 (define (ILoad) (tuple ILoad))
+(define (ICCall n) (tuple ICCall n))
 
 (define (compile exp code threshold)
   (case exp
@@ -56,6 +57,13 @@
      (compile (field 1 exp)
               (cons (ISet (field 0 exp)) code)
               threshold))
+    (CCall
+     (let ((init (cons (IString (field 0 exp))
+                       (cons (ICCall (length (field 1 exp)))
+                             code)))
+           (f (lambda (a b)
+                (compile b (cons (IPush) a) threshold))))
+       (fold-left f init (field 1 exp))))
     (App
      (cons (IPushRetAddr code) (compile-tail exp threshold)))
     (Plus
@@ -145,6 +153,7 @@
     (Int (compile exp (cons (IReturn) '()) threshold))
     (Bool (compile exp (cons (IReturn) '()) threshold))
     (String (compile exp (cons (IReturn) '()) threshold))
+    (CCall (compile exp (cons (IReturn) '()) threshold))
     (Load (compile exp (cons (IReturn) '()) threshold))
     (Var (compile exp (cons (IReturn) '()) threshold))
     (Plus (compile exp (cons (IReturn) '()) threshold))

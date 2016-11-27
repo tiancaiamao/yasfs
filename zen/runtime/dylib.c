@@ -55,7 +55,7 @@ void*
 handle_get(struct Handle *h, char *dylib_name, char *prim_name) {
   void *handle = handle_get_dylib(h, dylib_name);
   if (handle == NULL) {
-    void *handle = open_dylib(dylib_name);
+    handle = open_dylib(dylib_name);
     if (handle == NULL) {
       return NULL;
     }

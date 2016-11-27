@@ -321,7 +321,7 @@ vm_run(struct VM* vm, char *code) {
 
         printf("CCALL: n=%d %s %s\n", n, prim, dylib);
 
-        void *fn_ptr = handle_get(vm->handle, prim, dylib);
+        void *fn_ptr = handle_get(vm->handle, dylib, prim);
         if (fn_ptr == NULL) {
           // TODO check
         }

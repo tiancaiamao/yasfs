@@ -91,6 +91,9 @@
        (put-u32 p n)
        (put-bytevector p (str->bv (field 0 x)))
        (put-u8 p 0)))
+    (ICCall
+     (begin (put-u8 p idCCALL)
+            (put-u32 p (field 0 x))))
     (ILoad (put-u8 p idLOAD))
     (IStop (put-u8 p idSTOP))
     (IApply (put-u8 p idAPPLY))
