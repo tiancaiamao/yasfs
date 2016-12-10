@@ -1,4 +1,3 @@
-;; 如果找到返回int，找不到直接panic
 (define (find-env env v)
   (define (find e v i)
     (if (null? e) (+ 3 "find-env找不到直接panic")
@@ -32,15 +31,6 @@
     (Int ast)
     (String ast)
     (Load ast)
-    (Tuple
-     (let ((tag (if (eq? (field 0 ast) '_)
-                    0
-                    (name2tag (field 0 ast))))
-           (ls (map (lambda (x) (ast2lambda env x))
-                    (field 1 ast))))
-       (Tuple tag ls)))
-    (Field
-     (Field (field 0 ast) (ast2lambda env (field 1 ast))))
     (Fun
      (let ((args (field 0 ast))
            (ts (field 1 ast)))
@@ -98,10 +88,4 @@
     (Equal
      (Equal (ast2lambda env (field 0 ast))
             (ast2lambda env (field 1 ast))))
-    (Switch
-     (let ((fn (lambda (x)
-                 (cons (name2tag (car x))
-                       (ast2lambda env (cdr x))))))
-       (Switch (ast2lambda env (field 0 ast))
-               (map fn (field 1 ast)))))
     ))
