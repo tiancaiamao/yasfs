@@ -20,8 +20,7 @@
            (macro0 input))))))))
 
 (define (step-parse exp)
-  (ast2lambda (empty-env)
-              (parse exp)))
+  (parse exp '()))
 
 (define (step-compile ir)
   (compile ir (cons (IStop) '()) 0))
