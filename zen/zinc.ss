@@ -23,103 +23,78 @@
 (define (ICCall n) (tuple ICCall n))
 
 (define (compile exp code threshold)
-  (case exp
-    (Int (cons (IConst (field 0 exp)) code))
-    (Bool (cons (IBool (field 0 exp)) code))
-    (String (cons (IString (field 0 exp)) code))
-    (Load (compile (field 0 exp) (cons (ILoad) code) threshold))
-    (Var
-     (let ((n (Var&s exp)))
-       (if (< n threshold)
-           (cons (IStackAccess n) code)
-           (cons (IEnvAccess (- n threshold)) code))))
-    (Fun
-     (let ((n (field 0 exp))
-           (ts (field 1 exp)))
-       (cons (IClosure (compile-tail exp n)) code)))
-    (Fun1
-     (let ((n (field 0 exp))
-           (ts (field 1 exp)))
-       (cons (IClosure (compile-tail exp n)) code)))
-    (Let
-     (let ((n (field 0 exp))
-           (ts (field 1 exp)))
-       (cons (ILet n)
-             (fold-left
-              (lambda (o x)
-                (compile x o (+ threshold n)))
-              (cons (IEndLet n) code)
-              (reverse ts)))))
-    (Set
-     (compile (field 1 exp)
-              (cons (ISet (field 0 exp)) code)
-              threshold))
-    (CCall
-     (let ((init (cons (IString (field 0 exp))
-                       (cons (ICCall (length (field 1 exp)))
-                             code)))
-           (f (lambda (a b)
-                (compile b (cons (IPush) a) threshold))))
-       (fold-left f init (field 1 exp))))
-    (App
-     (cons (IPushRetAddr code) (compile-tail exp threshold)))
-    (Plus
-     (let ((a (field 0 exp))
-           (b (field 1 exp)))
-       (compile
-        a
-        (cons (IPush)
-              (compile
-               b
-               (cons (IPlus) code)
-               threshold))
-        threshold)))
-    (Sub
-     (let ((a (field 0 exp))
-           (b (field 1 exp)))
-       (compile
-        a
-        (cons (IPush)
-              (compile
-               b
-               (cons (ISub) code)
-               threshold))
-        threshold)))
-    (Mul
-     (let ((a (field 0 exp))
-           (b (field 1 exp)))
-       (compile
-        a
-        (cons (IPush)
-              (compile
-               b
-               (cons (IMul) code)
-               threshold))
-        threshold)))
-    (Div
-     (let ((a (field 0 exp))
-           (b (field 1 exp)))
-       (compile
-        a
-        (cons (IPush)
-              (compile
-               b
-               (cons (IDiv) code)
-               threshold))
-        threshold)))
-    (Equal
-     (compile (field 0 exp)
-              (cons (IPush)
-                    (compile (field 1 exp)
-                             (cons (IEqual) code)
-                             threshold))
-              threshold))
-    (If
-     (compile (field 0 exp)
-              (cons (IBranch (compile (field 1 exp) code threshold)
-                             (compile (field 2 exp) code threshold)) '())
-              threshold))
-    ))
+  (match-tuple exp
+               ((Int v) (cons (IConst v) code))
+               ((Bool v) (cons (IBool v) code))
+               ((String s) (cons (IString s) code))
+               ((Load s) (compile s (cons (ILoad) code) threshold))
+               ((Var n)
+                (if (< n threshold)
+                    (cons (IStackAccess n) code)
+                    (cons (IEnvAccess (- n threshold)) code)))
+               ((Fun n ts)
+                (cons (IClosure (compile-tail exp n)) code))
+               ((Fun1 n ts)
+                (cons (IClosure (compile-tail exp n)) code))
+               ((Let n ts)
+                (cons (ILet n)
+                      (fold-left
+                       (lambda (o x)
+                         (compile x o (+ threshold n)))
+                       (cons (IEndLet n) code)
+                       (reverse ts))))
+               ((Set n v)
+                (compile v (cons (ISet n) code) threshold))
+               ((CCall fn ts)
+                (let ((init (cons (IString fn)
+                                  (cons (ICCall (length ts))
+                                        code)))
+                      (f (lambda (a b)
+                           (compile b (cons (IPush) a) threshold))))
+                  (fold-left f init ts)))
+               ((App)
+                (cons (IPushRetAddr code) (compile-tail exp threshold)))
+               ((Plus a b)
+                (compile a
+                         (cons (IPush)
+                               (compile b
+                                        (cons (IPlus) code)
+                                        threshold))
+                         threshold))
+               ((Sub a b)
+                (compile a
+                         (cons (IPush)
+                               (compile b
+                                        (cons (ISub) code)
+                                        threshold))
+                         threshold))
+               ((Mul a b)
+                (compile a
+                         (cons (IPush)
+                               (compile b
+                                        (cons (IMul) code)
+                                        threshold))
+                         threshold))
+               ((Div a b)
+                (compile a
+                         (cons (IPush)
+                               (compile b
+                                        (cons (IDiv) code)
+                                        threshold))
+                         threshold))
+               ((Equal a b)
+                (compile a
+                         (cons (IPush)
+                               (compile b
+                                        (cons (IEqual) code)
+                                        threshold))
+                         threshold))
+               ((If a b c)
+                (compile a
+                         (cons (IBranch (compile b code threshold)
+                                        (compile c code threshold)) '())
+                         threshold))
+               ))
 
 (define (compile-tail exp threshold)
   (case exp

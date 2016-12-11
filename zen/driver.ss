@@ -1,6 +1,5 @@
 (load "core.ss")
 (load "parser.ss")
-(load "bruijn.ss")
 (load "zinc.ss")
 (load "emit.ss")
 
@@ -20,8 +19,9 @@
           (macro1
            (macro0 input))))))))
 
-(define (bruijn ast)
-  (ast2lambda (empty-env) ast))
+(define (step-parse exp)
+  (ast2lambda (empty-env)
+              (parse exp)))
 
 (define (step-compile ir)
   (compile ir (cons (IStop) '()) 0))
