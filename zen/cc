@@ -1,0 +1,11 @@
+#!/usr/local/bin/scheme --script
+
+(load "driver.ss")
+
+(define (compile-file)
+  ((step-emit
+    (step-compile
+     (step-parse (read))))
+   (standard-output-port)))
+
+(compile-file)

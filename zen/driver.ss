@@ -26,17 +26,16 @@
   (compile ir (cons (tuple IStop) '()) 0))
 
 (define (step-emit bc)
+  (lambda (p)
+    (for-each
+     (lambda (x) (emit-inst p x))
+     bc)))
+
+(define (step-emit-file bc filename)
   (let ((p
-         (open-file-output-port "test.out"
+         (open-file-output-port filename
                                 (file-options no-fail)
                                 (buffer-mode block))))
-    (for-each (lambda (x) (emit-inst p x)) bc)
+    ((step-emit bc) p)
     (flush-output-port p)
     (close-output-port p)))
-
-(define (eval-file file)
-  (step-emit
-   (step-compile
-    (bruijn
-     (parse
-      (read-file file))))))
