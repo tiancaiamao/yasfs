@@ -147,25 +147,6 @@
      (begin (put-u8 p idMAKEBLOCK)
             (put-u32 p (field 0 x))
             (put-u32 p (field 1 x))))
-    (IField
-     (begin (put-u8 p idGETFIELD)
-            (put-u32 p (field 0 x))))
-    (ISwitch
-     (let ((l (field 0 x)))
-       (let ((ii (map car l))
-             (tt (map cdr l)))
-         (let ((ll (fnbuf (map emit-inst-list tt))))
-           (put-u8 p idSWITCH)
-           (put-u32 p (length ll))
-           (for-each
-            (lambda (i v)
-              (put-u32 p i)
-              (put-u32 p (bytevector-length v)))
-            ii ll)
-           (for-each
-            (lambda (v)
-              (put-bytevector p v))
-            ll)))))
     (ILet
      (begin (put-u8 p idLET)
             (put-u8 p (field 0 x))))
