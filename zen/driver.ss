@@ -1,6 +1,6 @@
 (load "core.ss")
 (load "parser.ss")
-(load "zinc.ss")
+(load "compiler.ss")
 (load "emit.ss")
 
 (define (read-file file)
@@ -23,7 +23,7 @@
   (parse exp '()))
 
 (define (step-compile ir)
-  (compile ir (cons (IStop) '()) 0))
+  (compile ir (cons (tuple IStop) '()) 0))
 
 (define (step-emit bc)
   (let ((p
