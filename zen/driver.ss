@@ -23,7 +23,7 @@
   (parse exp '()))
 
 (define (step-compile ir)
-  (compile ir (cons (tuple IStop) '()) 0))
+  (compile ir (cons (tuple IStop) '())))
 
 (define (step-emit bc)
   (lambda (p)

@@ -1,13 +1,12 @@
 (define idSTOP     1)
-(define idPUSHADDR  2)
+(define idPUSHMARK 2)
 (define idCONST    3)
 (define idPUSH     4)
 (define idCLOSURE  5)
 (define idAPPLY    6)
 (define idGRAB     7)
-(define idRESTART   8)
-(define idSTACKACC  9)
-(define idENVACC   10)
+(define idRESTART  8)
+(define idACCESS   9)
 (define idADDINT   11)
 (define idRETURN   12)
 (define idBRANCH   13)
@@ -81,7 +80,7 @@
   (case x
     (IConst
      (begin (put-u8 p idCONST)
-            (put-u64 p (+ 1 (* 2 (field 0 x))))))
+            (put-u64 p (field 0 x))))
     (IBool
      (begin (put-u8 p idCONST)
             (put-u64 p (if (field 0 x) 18 34))))
@@ -111,23 +110,15 @@
          (put-u32 p (bytevector-length bv))
          (put-bytevector p bv))))
     (IGrab
-     (begin
-       (put-u8 p idRESTART)
-       (put-u8 p idGRAB)
-       (put-u8 p (field 0 x))))
-    (IPushRetAddr
-     (let-values (((op g) (open-bytevector-output-port)))
-       (for-each (lambda (x) (emit-inst op x)) (field 0 x))
-       (let ((bv (g)))
-         (put-u8 p idPUSHADDR)
-         (put-u32 p (bytevector-length bv))
-         (put-bytevector p bv))))
-    (IPush (put-u8 p idPUSH))
-    (IStackAccess
-     (begin (put-u8 p idSTACKACC)
-            (put-u8 p (field 0 x))))
-    (IEnvAccess
-     (begin (put-u8 p idENVACC)
+     (let loop ((i 0)
+                (n (field 0 x)))
+       (if (< i n)
+           (begin
+             (put-u8 p idGRAB)
+             (loop (+ i 1) n)))))
+    (IPushMark (put-u8 p idPUSHMARK))
+    (IAccess
+     (begin (put-u8 p idACCESS)
             (put-u8 p (field 0 x))))
     (IBranch
      (let-values (((op1 g1) (open-bytevector-output-port))
