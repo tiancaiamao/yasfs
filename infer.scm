@@ -292,3 +292,70 @@
 (infer '(case x
             [(:cons a b) ((+ a) 1)]
             [(:nil) 2]))
+
+
+(define gen-var
+  (let ((id 0))
+    (lambda ()
+      (set! id (+ id 1))
+      id)))
+
+(define generate-constraints
+  (lambda (exp env cstr-add debug)
+    (let* ((tvar (gen-var)))
+      (match exp
+             [(? integer?)
+              (cstr-add (cons tvar 'int))]
+             [(? boolean?)
+              (cstr-add (cons tvar 'bool))]
+             [(? symbol?)
+              (let ((find (assq exp env)))
+                (if find
+                    (set! tvar (cdr find))))]
+             [('if e1 e2 e3)
+              (let* ((t1 (generate-constraints e1 env cstr-add debug))
+                     (t2 (generate-constraints e2 env cstr-add debug))
+                     (t3 (generate-constraints e3 env cstr-add debug)))
+                (cstr-add (cons t1 'bool))
+                (cstr-add (cons t2 t3))
+                (cstr-add (cons tvar t2)))]
+             [('case x sels ...)
+              (generate-constraints-case-expr x sels env cstr-add debug)]
+             [('/. x e)
+              (let* ((tx (gen-var))
+                     (env1 (cons (cons x tx) env))
+                     (te (generate-constraints e env1 cstr-add debug)))
+                (cstr-add (cons tvar `(,tx -> ,te))))]
+             [(e1 e2)
+              (let* ((t1 (generate-constraints e1 env cstr-add debug))
+                     (t2 (generate-constraints e2 env cstr-add debug)))
+                (cstr-add (cons t1 `(,t2 -> ,tvar)))
+                (let ((find (builtin e1)))
+                  (if find
+                      (cstr-add (cons t1 (cdr find))))))])
+      (debug (cons tvar exp))
+      tvar)))
+
+(define generate-constraints-case-expr
+  (lambda (e0 sels env cstr-add debug)
+    (let* ((t0 (generate-constraints e0 env cstr-add debug))
+           (tags (map caar sels)))
+      (cstr-add (cons t0 `(var ,tags)))
+      (for-each ))))
+
+;; (define generate-constraints-case-expr-sel
+;;   (lambda (sel env cstr-add debug)
+;;     (let* ((tx (gen-var))))
+;;     (generate-constraints e env1 cstr-add debug)
+;;     (cstr-add )))
+
+(define (builtin x)
+  (and (symbol? x)
+       (assq x '((* . (int -> (int -> int)))
+                 (+ . (int -> (int -> int)))
+                 (> . (int -> (int -> bool)))))))
+
+(define (generate-constraints1 exp)
+  (let* ((cstr '())
+         (cstr-add (lambda (x) (set! cstr (cons x cstr)))))
+    (values (generate-constraints exp '() cstr-add display) cstr)))
