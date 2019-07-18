@@ -761,6 +761,12 @@ int main () { printf (\"result = %d\\n\", OBJ2INT(execute ())); return 0; }
 
 ;------------------------------------------------------------------------------
 
+(define (walk fn exp)
+  (if (pair? exp)
+      (map (lambda (z) (walk fn z)) exp)
+      (fn exp)))
+
+
 (define (compile-file filename)
   (let ((ast (parse-file filename)))
     (display "-------------------------- AST:\n")
@@ -777,7 +783,8 @@ int main () { printf (\"result = %d\\n\", OBJ2INT(execute ())); return 0; }
           (with-output-to-file
               (string-append (path-strip-extension filename) ".c")
             (lambda ()
-              (display code))))))))
+              (walk (lambda (x) (if (not (null? x)) (display x))) code)))
+          )))))
 
 (define (main filename)
   (compile-file filename))
