@@ -1,0 +1,140 @@
+;; 0 = type
+;; 1 = kind
+;; 2 = box
+
+(func assv
+      s [] => []
+      s [[x . y] . z] => [x . y] where (= s x)
+      s [_ . z] => (assv s z))
+
+(defun extend (env var val)
+  (cons (cons var val) env))
+
+(func infer-type
+      ctx 1 => 2
+      ctx 2 => (error "type of box is ?")
+      ctx x => (let find (assv x ctx)
+		    (if (null? find)
+			(error "var not find")
+		      (cdr find))) where (symbol? x)
+      ctx ['pi [x A] B] => (let tA (infer-type ctx A)
+				(let tB (infer-type (extend ctx x A) B)
+				     tB))
+      ctx [f x] => (match (infer-type ctx f)
+			  ['pi [a A] B]
+			  (let tx (infer-type ctx x)
+			       (if (alpha-eq? ctx tx A)
+				   (subst (extend () a x) B)
+				 (error "infer (f x) fail")))
+			  _ (error "infer-type [f x] error")))
+
+(defun alpha-eq? (ctx e1 e2)
+  (alpha-eq-h (normalize ctx e1) (normalize ctx e2)))
+
+(func alpha-eq-h
+      x1 x2 => (= x1 x2) where (and (symbol? x1) (symbol? x2))
+      k1 k2 => (= k1 k2) where (and (number? k1) (number? k2))
+      [f1 x1] [f2 x2] => (and (alpha-eq-h f1 f2)
+			      (alpha-eq-h x1 x2))
+      ['pi [x1 A1] B1] ['pi [x2 A2] B2] => (and (alpha-eq-h A1 A2)
+						(let z (gensym 'bbc)
+						     (alpha-eq-h (subst (extend () x1 z) B1)
+								 (subst (extend () x2 z) B2))))
+      ['lambda [x1 A1] B1] ['lambda [x2 A2] B2] => (and (alpha-eq-h A1 A2)
+						    (lambda z (gensym 'cca)
+						      (alpha-eq-h (subst (extend () x1 z) B1)
+								  (subst (extend () x2 z) B2))))
+      _ _ => false)
+
+(func normalize
+      env var => (let find (assv var env)
+		      (if (null? find)
+			  (error "unknown identifier %t")
+			(match (cdr find)
+			       ['#def t val] (normalize env val) 
+			       ['#bind t] var)))
+      where (symbol? var)
+      env [e1 e2] => (let ne2 (normalize env e2)
+			  (match (normalize env e1)
+				 ['lambda [x _] e] (normalize env (subst (extend () x ne2) e))
+				 f [f e2]))
+      env uni => uni where (number? uni)
+      env ['pi [x A] B] => ['pi . (normalize-abstraction env x A B)]
+      env ['lambda [x t] e] => ['lambda . (normalize-abstraction env x t e)])
+
+(defun normalize-abstraction (env x t e)
+  (let t1 (normalize env t)
+       [[x t1] (normalize (extend env x ['#bind t1]) e)]))
+
+(func subst
+      env var => (let find (assv var env)
+		      (if (null? find)
+			  var
+			(cdr find)))
+      where (symbol? var)
+      env uni => uni where (number? uni)
+      env ['pi [x A] B] => ['pi . (subst-abstruction env x A B)]
+      env ['lambda [x A] B] => ['lambda . (subst-abstruction env x A B)]
+      env [f x] => [(subst env f) (subst env x)])
+
+(func subst-abstruction
+      env x t e => (let x1 (gensym x)
+			[[x1 (subst env t)] (subst (extend env x x1) e)]))
+
+(func check-type
+      ctx x A => 
+      ctx ['lambda x y] ['pi [a A] B] => (check-type (extend ctx x A) y
+						     (subst a x B))
+      ctx e t => (alpha-eq? (infer-type ctx e) t))
+
+
+
+(let ctx (extend () 'id '(pi (x 1) (pi (y x) x)))
+
+     (infer-type ctx '(id (pi (x 1) (pi (y x) x)))))
+
+===>  (pi (#y422 (pi (x 1) (pi (y x) x))) (pi (x 1) (pi (y x) x)))
+===>  (pi (#y458 (pi (x 1) (pi (y x) x))) (pi (x 1) (pi (y x) x)))
+
+===>  (pi (x 1) (pi (y x) x))
+
+     (infer-type ctx '((id (pi (x 1) (pi (y x) x))) id)))
+
+
+
+
+     (infer-type ctx '(pi (x 1) (pi (y x) x))))
+
+     (infer-type ctx 1))
+     (infer-type ctx 'id))
+
+(infer-type
+
+
+id  ['pi [x 1] ['pi [y x] x]]
+(lambda x (lambda y y))
+
+
+((id ['pi [x T] ['pi [y x] x]]) id)
+      
+
+infer-type    (id ['pi [x T] ['pi [y x] x]])
+
+
+infer-type    id    => ['pi [x T1] ['pi [y x] x]]
+
+
+check-type    ['pi [x T] ['pi [y x] x]]   T1
+
+
+(subst  x      ['pi [x T] ['pi [y x] x]]      ['pi [y x] x])
+
+['pi [_ ['pi [x T] ['pi [y x] x]]]        ['pi [x T] ['pi [y x] x]]]
+
+(subst 'x '(pi (x 1) (pi (y x) x)) '(pi (y x) x))
+
+(subst (extend () 'x '(pi (x 1) (pi (y x) x))) '(pi (y x) x))
+
+
+(pi (#y408 (pi (x 1) (pi (y x) x)))
+   (pi (x 1) (pi (y x) x)))

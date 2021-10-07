@@ -1,0 +1,125 @@
+
+
+;; (defun return (val)
+;;   (lambda (state)
+;;     [state . value]))
+
+
+;; (defun bind (m f)
+;;   (lambda (state)
+;;     (let ret (m state)
+;; 	 (let state1 (car ret)
+;; 	      val (cdr ret)
+;; 	      ((f val) state1)))))
+
+;; (defun get ()
+;;   (lambda (state)
+;;     [state . state]))
+
+;; (defun put (state)
+;;   (lambda (_)
+;;     [state . ()]))
+
+;; (defun run-state (state m)
+;;   (m state))
+
+
+
+
+
+;; (defun pure (x)
+;;   ['pure x])
+
+;; (defun impure (f)
+;;   ['impure v])
+
+;; (defun result (v)
+;;   (pure v))
+
+;; (func fmap
+;;       f ['pure x] => ['pure (f x)]
+;;       f ['impure m] => ['impure (fmap (fmap f) m)])
+
+;; (func bind
+;;       ['pure x] k => ['pure x]
+;;       ['impure fa] k => (impure (fmap (lambda (m) (bind m k))
+;; 				      fa)))
+
+;; (defun eta (toy)
+;;   (impure ((fmap (lambda (c) (pure c))) toy)))
+
+
+;; (defun output (c n)
+;;   [['output c]  n])
+
+;; (defun bell (n)
+;;   [['bell] n])
+
+;; (defun done ()
+;;   [['done] ()])
+k
+
+
+
+
+(func catch
+      ['Fix x] f => ['Fix (fmap (flip catch f) x)]
+      ['Throw e] f => (f e))
+
+
+
+(func fmap
+      f ['Output x next]  => ['Output x (f next)]
+      f ['Bell next]      => ['Bell (f next)]
+      f ['Done]           => ['Done])
+
+
+
+
+
+(try ['Fix ['Output 'A  ['Throw 'IncompleteException]]])
+(catch ['Fix ['Bell ['Fix Done]]])
+
+
+data Free f r = Free (f (Free f r)) | Pure r
+
+data FixE f e = Fix (f (FixE f e)) | Throw e
+
+
+(defun bind
+    ['Free x] f => ['Free (fmap (lambda (m) (bind m f)) x)]
+    ['Pure r] f => (f r))
+
+(defun output (x)
+  ['Free ['Output x ['Pure ()]]])
+
+(defun bell ()
+  ['Free ['Bell ['Pure ()]]])
+
+(defun done ()
+  ['Free ['Done]])
+
+;; (defun liftF (cmd)
+;;   ['Free (fmap (lambda (x) ['Pure x]) cmd])])
+
+
+(func interp
+      ['Free ['Output b next]] =>  ??  (interp next)
+      ['Free ['Bell next]] =>  ?? (interp next)
+      ['Free ['Done] =>  ...jjj
+      ['Pure r] => (error "xxx"))
+
+
+do
+    (output 'A)
+    (bell)
+    (done)
+
+
+(func handle
+      ['Free ['Output x next]] =>  (print x) (show next)
+      ['Free ['Bell next]] => (print) (show next)
+      ['Free ['Done]] => (print)
+      ['Pure x] => 
+
+	    

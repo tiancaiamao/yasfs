@@ -1,0 +1,716 @@
+(func assv
+      s [] => []
+      s [[x . y] . z] => [x . y] where (= s x)
+      s [_ . z] => (assv s z))
+      
+
+(defun extend (env var val)
+  (cons (cons var val) env))
+
+(defun add-* (x)
+  (intern (string-append (symbol->string x) "*")))
+
+(defun freshen (used x)
+  (if (elem? x used)
+      (freshen used (add-* x))
+    x))
+
+;; (func val
+;;       env ['lambda x body] => ['#CLOS env x body]
+;;       env x => (let find (assv x env)
+;; 		    (if (cons? find)
+;; 			(cdr find)
+;; 		      (error "val unknown")))
+;;       where (symbol? x)
+;;       env [f x] => (do-ap (val env f) (val env x)))
+
+;; (func do-ap
+;;       ['#CLOS env x b] arg => (val (extend env x arg) b)
+;;       fun arg => ['#N-ap fun arg])
+
+;; (func read-back
+;;       used-names ['#CLOS env x body] => (let y (freshen used-names x)
+;; 					     (let y1 ['#N-var y]
+;; 						  ['lambda y (read-back (cons y used-names)
+;; 									(val (extend env x y1) body))]))
+;;       used-names ['#N-var x] => x
+;;       used-names ['#N-ap f x] => [(read-back used-names f) (read-back used-names x)] )
+
+;; (read-back () (val () '((lambda x (lambda y (x y))) (lambda x x))))
+
+;; (read-back () '(#CLOS ((x #CLOS () x x)) y (x y)))
+
+(defun norm (env e)
+  (read-back () (val env e)))
+
+;; (func run-program
+;;       env () => ()
+;;       env [['define x e] . more] => (let v (val env e)
+;; 					 (run-program (extend env x v) more))
+;;       env [e . more] => (begin
+;; 			 (display (norm env e))
+;; 			 (run-program env more)))
+       
+
+(defun with-numerals (e)
+  ['(define church-zero
+      (lambda f
+	(lambda x
+	  x)))
+  '(define church-add1
+     (lambda n-1
+       (lambda f
+	 (lambda x
+	   (f ((n-1 f) x))))))
+  e])
+
+(defun to-church (n)
+  (if (= n 0)
+      'church-zero
+    (let n-1 (to-church (- n 1))
+	 ['church-add1 n-1])))
+  
+;; (run-program () '((define church-zero (lambda f (lambda x x)))
+;; 		  (define church-add1 (lambda n-1 (lambda f (lambda x (f ((n-1 f) x))))))
+;; 		  church-zero))
+
+(defun go (result)
+  ['#go result])
+
+(defun stop (exp msg)
+  ['#stop exp msg])
+
+(func bind
+      ['#go res] f => (f res)
+      x f => x)
+
+(defmacro go-on (exp)
+  (rewrite-go-on (cdr exp)))
+
+(func rewrite-go-on
+      [val exp . more] => ['bind exp ['lambda [val] (rewrite-go-on more)]]
+      [exp] => exp)
+
+;; (go-on x (bigger-than-two 4)
+;;        y (bigger-than-two -3)
+;;        (go (+ x y)))
+
+(func type=?
+      'Nat 'Nat => true
+      ['-> a1 b1] ['-> a2 b2] => (and (type=? a1 a2) (type=? b1 b2))
+      x y => false)
+
+(defun type? (t)
+  (type=? t t))
+
+(func synth
+      ctx ['the t e2] => (if (not (type? t))
+			     (stop e "Invalid type ~a")
+			   (go-on _ (check ctx e2 t)
+				  (go t)))
+      ctx ['rec type target base step] =>
+      (go-on target-t (synth ctx target)
+	     _ (if (type=? target-t 'Nat)
+		   (go 'ok)
+		 (stop target "Expected Nat, got ~v"))
+	     _ (check ctx base type)
+	     _ (check ctx step ['-> 'Nat ['-> type type]])
+	     (go type)) 
+      ctx x => (let find (assv x ctx)
+		    (if (= find ())
+			(stop x "Variable not found")
+		      (go (cdr find))))
+      where (symbol? x)
+      ctx [rator rand] => (go-on rator-t (synth ctx rator)
+				 (match rator-t
+					['-> a b] (go-on _ (check ctx rand a)
+							 (go b))
+					_ (stop rator "Not a function type ~v"))))
+
+(func check
+      ctx 'zero t => (if (type=? t 'Nat)
+			 (go 'ok)
+		       (stop e "Tried to use ~v for zero"))
+      ctx ['add1 n] t => (if (type=? t 'Nat)
+			     (go-on _ (check ctx n 'Nat)
+				    (go 'ok))
+			   (stop e "Tried to use ~v for add1"))
+      ctx ['lambda x body] ['-> a b] => (go-on _ (check (extend ctx x a) body b)
+					       (go 'ok))
+      ctx ['lambda x body] t => (stop e "Instead of -> type, got a ")
+      ctx e t => (go-on t2 (synth ctx e)
+			(if (type=? t t2)
+			    (go 'ok)
+			  (stop e "Synthesized type ~v where type ~v was expected"))))
+		      
+;; (synth (list (cons 'x 'Nat)) 'x)
+;; (check () 'zero 'Nat)
+;; (check () '(add1 zero) 'Nat)
+;; (check () '(lambda x x) '(-> Nat Nat))
+
+;; (check ()
+;;        '(lambda j
+;; 	  (lambda k
+;; 	    (rec Nat j k (lambda n1
+;; 			   (lambda sum
+;; 			     (add1 sum))))))
+;;        '(-> Nat (-> Nat Nat)))
+
+(func check-program
+      ctx () => (go ctx)
+      ctx [['define x e] . rest] => (go-on t (synth ctx e)
+					   (check-program (extend ctx x t) rest))
+      ctx [e . rest] => (go-on t (synth ctx e)
+			       (begin
+				(display e)
+				(display "has type")
+				(display t)
+				(check-program ctx rest))))
+
+;; (check-program '()
+;; 	       '((define three
+;; 		   (the Nat
+;; 			(add1 (add1 (add1 zero)))))
+;; 		 (define +
+;; 		   (the (-> Nat (-> Nat Nat))
+;; 			(lambda n
+;; 			  (lambda k
+;; 			    (rec Nat n
+;; 				 k
+;; 				 (lambda pred
+;; 				   (lambda almost-sum
+;; 				     (add1 almost-sum))))))))
+;; 		 (+ three)
+;; 		 ((+ three) three)))
+
+(defun ZERO ()
+  '(#ZERO))
+
+(defun ADD1 (pred)
+  ['#ADD1 pred])
+
+(defun NEU (type neu)
+  ['#NEU type neu])
+
+(defun N-var (name)
+  ['#N-var name])
+
+(defun N-ap (rator rand)
+  ['#N-ap rator rand])
+
+(defun N-rec (type target base step)
+  ['#N-rec type target base step])
+
+(defun THE (type value)
+  ['#THE type value])
+
+;; (defun norm? (v)
+;;   (and (cons? v)
+;;        (= (car v) '#THE)))
+
+(func val
+      ctx ['the type exp] => (val ctx exp)
+      ctx 'zero => (ZERO)
+      ctx ['add1 n] => (ADD1 (val ctx n))
+      ctx x => (cdr (assv x ctx)) where (and (symbol? x) (not (elem? x '(the zero add1 lambda rec))))
+      ctx ['lambda x b] => ['#CLOS ctx x b]
+      ctx ['rec type target base step] => (do-rec type (val ctx target) (val ctx base) (val ctx step))
+      ctx [rator rand] => (do-ap (val ctx rator) (val ctx rand)))
+
+(func do-ap
+      ['#CLOS ctx x e] arg => (val (extend ctx x arg) e)
+      ['#NEU ['-> a b] ne] arg => (NEU b (N-ap ne (THE a arg))))
+
+(func do-rec
+      type ['#ZERO] base step => base
+      type ['#ADD1 n] base step => (do-ap (do-ap step n)
+					  (do-rec type n base step))
+      type ['#NEU 'Nat ne] base step => (NEU type
+					     (N-rec type
+						    ne
+						    (THE type base)
+						    (THE ['-> 'Nat ['-> type type]] step))))
+
+(func read-back
+      used-names 'Nat ['#ZERO] => 'zero
+      used-names 'Nat ['#ADD1 n] => ['add1 (read-back used-names 'Nat n)]
+      used-names 'Nat ['#NEU _ ne] => (read-back-neutral used-names ne)
+      used-names ['-> a b] value => (let x (freshen used-names 'x)
+					 ['lambda x (read-back (cons x used-names)
+							       b
+							       (do-ap value (NEU a (N-var x))))]))
+(func read-back-neutral
+      used-names ['#N-var x] => x
+      used-names ['#N-ap fun ['#THE arg-type arg]] => [(read-back-neutral used-names fun) (read-back used-names arg-type arg)]
+      used-names ['#N-rec type target ['#THE base-type base] ['#THE step-type step]] => ['rec type
+      (read-back-neutral used-names target)
+      (read-back used-names base-type base)
+      (read-back used-names step-type step)])
+
+(defun def (type value)
+  ['#def type value])
+
+(func defs->ctx
+      () => ()
+      [(cons x ['#def type _]) . rest] => (extend (defs->ctx rest) x type))
+      
+(func defs->env
+      () => ()
+      [(cons x ['#def _ value]) . rest] => (extend (defs->env rest) x value))
+					 
+(func run-program
+      delta [] => (go delta)
+      delta [['define x e] . rest] => (go-on type (synth (defs->ctx delta) e)
+					     (run-program (extend delta x
+								  (def type (val (defs->env delta) e)))
+							  rest))
+      delta [e . rest] => (let ctx (defs->ctx delta)
+			       env (defs->env delta)
+			       (go-on type (synth ctx e)
+				      (let v (val env e)
+					   (begin
+					    (display "(the ")
+					    (display type)
+					    (display (read-back (map car ctx) type v))
+					    (run-program delta rest))))))
+					   
+(run-program () '((define +
+		    (the (-> Nat (-> Nat  Nat))
+			 (lambda x
+			   (lambda y
+			     (rec Nat x
+				  y
+				  (lambda _
+				    (lambda sum
+				      (add1 sum))))))))
+		  +
+		  (+ (add1 (add1 zero)))
+		  ((+ (add1 (add1 zero))) (add1 zero))))
+
+(set 'keywords '(define U Nat zero add1 ind-Nat
+		  Sigma cons car cdr
+		  pi lambda
+		  = same replace
+		  Trivial sole
+		  Absurd ind-Absurd
+		  Atom quote
+		  the))
+
+(defun keyword? (x)
+  (if (elem? x keywords)
+      true
+    false))
+
+(defun var? (x)
+  (and (symbol? x)
+       (not (keyword? x))))
+
+(defun alpha-eq? (e1 e2)
+  (alpha-eq-aux e1 e2 () ()))
+
+(func alpha-eq-aux
+      e1 e2 xs1 xs2 => true where (and (keyword? e1) (keyword? e2) (= e1 e2))
+      x y xs1 xs2 => (let x1 (assv x xs1)
+			  x2 (assv y xs2)
+			  (alpha-eq-find x1 x2 x y)) where (and (var? x) (var? y))
+      ['lambda x1 b1] ['lambda x2 b2] xs1 xs2 =>
+      (let fresh (gensym 's)
+	   (alpha-eq-aux b1 b2 (cons (cons x1 fresh) xs1) (cons (cons x2 fresh) xs2)))
+      ['pi [x a1] b1] ['pi [y a2] b2] xs1 xs2 =>
+      (and (alpha-eq-aux a1 a2 xs1 xs2)
+	   (let fresh (gensym 's)
+		(alpha-eq-aux b1 b2 (cons (cons x fresh) xs1) (cons (cons y fresh) xs2))))
+      ['sigma [x a1] b1] ['sigma [y a2] b2] xs1 xs2 =>
+      (and (alpha-eq-aux a1 a2 xs1 xs2)
+	   (let fresh (gensym 's)
+		(alpha-eq-aux b1 b2 (cons (cons x fresh) xs1) (cons (cons y fresh) xs2))))
+      ['quote x] ['quote y] => (= x y)
+      ['the 'Absurd e1] ['the 'Absurd e2] => true
+      [op1 . arg1] [op2 . arg2] xs1 xs2 => (alpha-eq-list arg1 arg2 xs1 xs2) where (and (keyword? op1) (keyword? op2) (= op1 op2))
+      [rator1 rand1] [rator2 rand2] xs1 xs2 => (and (alpha-eq-aux rator1 rator2 xs1 xs2)
+						    (alpha-eq-aux rand1 rand2 xs1 xs2)))
+
+(func alpha-eq-find
+      [] [] x y => (= x y)
+      (cons _ b1) (cons _ b2) => (= b1 b2)
+      _ _ => false)
+
+(func alpha-eq-list
+      [] [] h1 h2=> true
+      [x1 . xs1] [x2 . xs2] h1 h2 => (and (alpha-eq-aux x1 x2 h1 h2)
+					  (alpha-eq-list xs1 xs2 h1 h2)))
+
+(defun PI (domain range)
+  ['#PI domain range])
+
+(defun LAM (body)
+  ['#LAM body])
+
+(defun PAIR (car cdr)
+  ['#PAIR car cdr])
+
+(defun NAT ()
+  ['#NAT])
+
+(defun ZERO ()
+    ['#ZERO])
+
+(defun ADD! (pred)
+    ['#ADD1 pred])
+
+(defun EQ (type from to)
+  ['#EQ type from to])
+
+(defun SAME ()
+  ['#SAME])
+
+(defun TRIVIAL ()
+  ['#TRIVIAL])
+
+(defun SOLE ()
+  ['#SOLE])
+
+(defun ABSURD ()
+  ['#ABSURD])
+
+(defun ATOM ()
+  ['#ATOM])
+
+(defun QUOTE (symbol)
+  ['#QUOTE symbol])
+
+(defun UNI ()
+  ['#UNI])
+
+(defun NEU (type neutral)
+  ['#NEU type neutral])
+
+
+(defun H-O-CLOS (x fun)
+  ['#H-O-CLOS x fun])
+
+(defun closure? (c)
+  (and (cons? c)
+       (let flag (car c)
+	    (or (= flag '#CLOS) (= flag '#H-O-CLOS)))))
+
+(defun N-var (name)
+  ['#N-var name])
+
+(defun N-ap (fun arg)
+  ['#N-ap fun arg])
+
+(defun N-car (pair)
+  ['#N-car pair])
+
+(defun N-cdr (pair)
+  ['#N-cdr pair])
+
+(defun N-int-Nat (target motive base step)
+  ['#N-int-Nat target motive base step])
+
+(defun N-replace (target motive base)
+  ['#N-replace target motive base])
+
+(defun N-ind-Absurd (target motive)
+  ['#N-ind-Absurd target motive])
+
+(defun THE (type val)
+  ['#THE type val])
+
+
+(defun def (type value)
+  ['#def type value])
+
+(defun def? (x)
+  (and (cons? x) (= (car x) '#def)))
+
+(defun bind (type)
+  ['#bind type])
+
+(defun bind? (x)
+  (and (cons? x) (= (car x) '#bind)))
+
+(func context?
+      () => true
+      [[x . y] . rest] => (and (symbol? x)
+			       (or (def? y) (bind? y))
+			       (context? rest))
+      _ => false)
+
+(defun lookup-type (x ctx)
+  (lookup-type-r (assv x ctx)))
+
+(func lookup-type-r
+      () => (stop "unknown variable")
+      [_ . ['#bind type]] => (go type)
+      [_ . ['#def type _]] => (go type))
+
+(func ctx->env-binder
+      [x . ['#bind type]] => (cons name (NEU type (N-var name)))
+      [x . ['#def _ value]] => (cons name value))
+
+(defun ctx->env (ctx)
+  (map ctx->env-binder ctx))
+
+(defun extend-env (ctx x t)
+  (cons (cons x (bind t)) ctx))
+
+(func val-of-closure
+      ['#CLOS ctx x e] v => (val (extend ctx x v ) e)
+      ['#H-O-CLOS x f] v => (f v))
+
+(func val
+      ctx ['#THE type exp] => (val ctx exp)
+      ctx 'U => (UNI)
+      ctx ['pi [x A] B] => (PI (val ctx A) (CLOS ctx x B))
+      ctx ['lambda x b] => (LAM (CLOS ctx x b))
+      ctx ['sigma [x A] D] => (SIGMA (val ctx A) (CLOS ctx X D))
+      ctx ['cons a d] => (PAIR (val ctx a) (val ctx d))
+      ctx ['car p] => (do-car (val ctx p))
+      ctx ['cdr p] => (do-cdr (val ctx p))
+      ctx 'Nat => (Nat)
+      ctx ['zero] => (ZERO)
+      ctx ['add1 n] => (ADD1 (val ctx n))
+      ctx ['ind-Nat target motive base step] => (do-int-Nat (val ctx target) (val ctx motive) (val ctx base) (val ctx step))
+      ctx ['= A from to] => (EQ (val ctx A) (val ctx from) (val ctx to))
+      ctx 'same => (SAME)
+      ctx ['replace target motive base] => (do-replace (val ctx target) (val ctx motive) (val ctx base))
+      ctx 'Trivial => (TRIVIAL)
+      ctx 'sole => (SOLE)
+      ctx 'Absurd => (ABSURD)
+      ctx ['ind-Absurd target motive] => (do-ind-Absurd (val ctx target) (val ctx motive))
+      ctx 'Atom => (ATOM)
+      ctx ['quote a] => (QUOTE a)
+      ctx [rator rand] => (do-ap (val ctx rator) (val ctx rand))
+      ctx x => (cdr (assv x ctx)) where (var? x))
+
+(func do-car
+      ['#PAIR a d] => a
+      ['#NEU ['#SIGMA A _] ne] => (NEU A (N-car ne)))
+      
+(func do-cdr
+      ['#PAIR a d] => d
+      ['#NEU ['#SIGMA _ D] ne] => (NEU (val-of-closure D (do-car v))
+				       (N-cdr new)))
+
+(func do-ap
+      ['#LAM c] arg => (val-of-closure c arg)
+      ['#NEU ['#PI A B] ne] => (NEU (val-of-closure B arg)
+				    (N-ap ne (THE A arg))))
+
+(func do-ind-Absurd
+      ['#NEU ['#ABSURD] ne] motive => (NEU motive (N-ind-Absurd ne (THE (UNI) motive))))
+
+(func do-replace
+      ['#SAME] motive base => base
+      ['#NEU ['#EQ A from to] ne] motive base => (NEU (do-ap motive to)
+						      (N-replace ne
+								 (THE (PI A (H-O-CLOS 'x (lambda (_) (UNI))))
+								      motive)
+								 (THE (do-ap motive from)
+								      base))))
+
+(func do-ind-Nat
+      ['#ZERO] motive base step => base
+      ['#ADD1 n] motive base step => (do-ap (do-ap step n) (do-ind-Nat n motive base step))
+      ['#NEU ['#NAT] ne] motive base step => (NEU (do-ap motive target
+							 (N-ind-Nat
+							  ne
+							  (THE (PI (NAT)
+								   (H-O-CLOS 'k (lambda (k) (UNI)))))
+							  (THE (do-ap motive (ZERO)) base)
+							  (THE (ind-Nat-step-type motive) step)))))
+(defun ind-Nat-step-type (motive)
+  (PI (NAT)
+      (H-O-CLOS 'n1
+		(lambda (n1)
+		  (PI (do-ap motive n1)
+		      (H-O-CLOS 'ih
+				(lambda (ih)
+				  (do-ap motive (ADD1 n1)))))))))
+
+
+(func read-back-norm
+      ctx ['#THE ['#NAT] ['#ZERO]] => 'zero
+      ctx ['#THE ['#NAT] ['#ADD1 n]] => ['add1 (read-back-norm ctx (THE (NAT) n))]
+      ctx ['#THE ['#PI A B] f] => (let x (closure-name B)
+				       (let y (freshen (map car ctx) x)
+					    (let y-val (NEU A (N-var y))
+						 ['lambda y
+						 (read-back-norm (extend-ctx ctx y A)
+								 (THE (val-of-closure B y-val)
+								      (do-ap f y-val))))))
+      ctx ['#THE ['#SIGMA A D] p] => (let the-car (THE A (do-car p))
+					  (let the-cdr (THE (val-of-closure D the-car) (do-cdr p))
+					       ['cons (read-back-norm ctx the-car) (read-back-norm ctx the-cdr)]))
+      ctx ['#THE ['#TRIVIAL] _] => 'sole
+      ctx ['#THE ['#ABSURD] ['#NEU ['#ABSURD] ne]] => ['the 'Absurd (read-back-neutral ctx ne)]
+      ctx ['#THE ['#EQ A from to] ['#SAME]] => 'same
+      ctx ['#THE ['#ATOM] ['#QUOTE x]] => ['quote x]
+      ctx ['#THE ['#UNI] ['#NAT]] => 'Nat
+      ctx ['#THE ['#UNI] ['#ATOM]] => 'Atom
+      ctx ['#THE ['#UNI] ['#TRIVIAL]] => 'Trivial
+      ctx ['#THE ['#UNI] ['#ABSURD]] => 'Absurd
+      ctx ['#THE ['#UNI] ['#EQ A from to]] => ['= (read-back-norm ctx (THE (UNI) A)) (read-back-norm ctx (THE A from)) (read-back-norm ctx (THE A to))]
+      ctx ['#THE ['#UNI] ['#SIGMA A D]] => (let x (closure-name D)
+						(let y (freshen (map car ctx) x)
+						     ['sigma [y (read-back-norm ctx (THE (UNI) A))]
+						     (read-back-norm (extend-ctx ctx y A)
+								     (THE (UNI) (val-of-closure D (NEU A (N-var y)))))))
+      ctx ['#THE ['#UNI] ['#PI A B]] => (let x (closure-name B)
+					     (let y (freshen (map car ctx) x)
+						  ['pi [y (read-back-norm ctx (THE (UNI) A))]
+						  (read-back-norm (extend-ctx ctx y A)
+								  (THE (UNI) (val-of-closure B (NEU A (N-var y)))))))
+      ctx ['#THE ['#UNI] ['#UNI]] => 'U
+      ctx ['#THE t1 ['#NEU t2 ne]] => (read-back-neutral ctx ne))
+
+(func read-back-neutral
+      ctx ['#N-var x] => x
+      ctx ['#N-ap ne rand] => [(read-back-neutral ctx ne) (read-back-norm ctx rand)]
+      ctx ['#N-car ne] => ['car (read-back-neutral ctx ne)]
+      ctx ['#N-cdr ne] => ['cdr (read-back-neutral ctx ne)]
+      ctx ['#N-ind-Nat ne motive base step] =>
+      ['ind-Nat (read-back-neutral ctx ne)
+      (read-back-norm ctx motive)
+      (read-back-norm ctx base)
+      (read-back-norm ctx step)]
+      ctx ['#N-replace ne motive base] => ['replace (read-back-neutral ctx ne) (read-back-norm ctx motive) (read-back-norm ctx base)]
+      ctx ['#N-ind-Absurd ne motive] => ['ind-Absurd ['the 'Absurd (read-back-neutral ctx ne) (read-back-norm ctx motive)]])
+
+(func synth
+      ctx ['the type expr] => (go-on t-out (check ctx type (UNI))
+				     e-out (check ctx expr (val (ctx->env ctx) t-out))
+				     (go ['the t-out e-out]))
+      ctx 'U => (go '(the U U))
+      ctx ['pi [x A] D] => (go-on A-out (check ctx A (UNI))
+				  D-out (check (extend-ctx ctx x (val (ctx->env ctx) A-out)) D (UNI))
+				  (go ['the 'U ['pi [x A-out] D-out]))
+      ctx ['sigma [x A] D] => (go-on A-out (check ctx A (UNI))
+				     D-out (check (extend-ctx ctx x (val (ctx->env ctx) A-out)) D (UNI))
+				     (go ['the 'U ['sigma [x A-out] D-out]))
+      ctx ['car p] => (go-on pr (synth ctx p)
+			     (match pr
+				    ['the p-t p-out]
+				    (match (val (ctx->env ctx) p-t)
+					   ['#SIGMA A D] (go ['the (read-back-norm ctx (THE (UNI) A)) ['car p-out])
+					   v (stop e (format "expect sigma, got ~v"
+							     (read-back-norm ctx (THE (UNI) v)))))))
+      ctx ['cdr p] => (go-on pr (synth ctx p)
+			     (match pr
+				    ['the p-t p-out]
+				    (match (val (ctx->env ctx) p-t)
+					   ['#SIGMA A D] (let the-car (do-car (val (ctx->env ctx) p-out))
+							      (go ['the (read-back-norm ctx (THE (UNI) (val-of-closure D the-car)))
+								  ['cdr p-out]]))
+					   v (stop e (format "expected sigma, get ~v"
+							     (read-back-norm ctx (THE (UNI) v)))))))
+      ctx 'Nat => (go '(the U Nat))
+      ctx ['ind-Nat target motive base step] => (go-on target-out (check ctx target (NAT))
+						       motive-out (check ctx motive (PI (NAT) (H-O-CLOS 'n (lambda (_) (UNI)))))
+						       motive-val (go (val (ctx->env ctx) motive-out))
+						       base-out (check ctx base (do-ap motive-val (ZERO)))
+						       step-out (check ctx step (ind-Nat-step-type motive-val))
+						       (go ['the (read-back-norm
+								  ctx
+								  (THE (UNI)
+								       (do-ap motive-val (val (ctx->env ctx) target-out))))
+							   ['ind-Nat target-out motive-out base-out step-out]))
+      ctx ['= A from to] => (go-on A-out (check ctx A (UNI))
+				   A-val (go (val (ctx->env ctx) A-out))
+				   from-out (check ctx from A-val)
+				   to-out (check ctx to A-val)
+				   (go ['the U ['= A-out from-out to-out]]))
+      ctx ['replace target motive base] => (go-on target-out (synth ctx target)
+						  (match target-out
+							 ['the target-t target-out]
+							 (match (val (ctx->env ctx) target-t)
+								['#EQ A from to]
+								(go-on motive-out (check ctx motive (PI A (H-O-CLOS 'x (lambda (x) (UNI)))))
+								       motive-v (go (val (ctx->env ctx) motive-out))
+								       base-out (check ctx base (do-ap motive-v from))
+								       (go ['the (read-back-norm ctx (THE (UNI) (do-ap motive-v to)))
+									   ['replace target-out motive-out base-out])))
+							 else (stop target (format "Expected =, but type is ~a" else))))
+      ctx ['pi [x A] B] => (go-on A-out (check ctx A (UNI))
+				  B-out (check (extend-ctx ctx x (val (ctx->env ctx) A-out)) B (UNI))
+				  (go ['the 'U ['pi [x A-out] B-out]]))
+      ctx ['sigma [x A] B] => (go-on A-out (check ctx A (UNI))
+				     B-out (check (extend-ctx ctx x (val (ctx->env ctx) A-out)) B (UNI))
+				     (go ['the 'U ['sigma [x A-out] B-out]]))
+      ctx 'Trivial => (go '(the U Trivial))
+      ctx 'Absurd => (go '(the U Absurd))
+      ctx ['ind-Absurd target motive] => (go-on target-out (check ctx target (ABSURD))
+						motive-out (check ctx motive (UNI))
+						(go ['the motive-out ['ind-Absurd target-out motive-out]]))
+      ctx [rator rand] => (go-on tmp (synth ctx rator)
+				 (match tmp ['the rator-t rand-t]
+					(match (val (ctx->env ctx) rator-t)
+					       ['#PI A B]
+					       (go-on rand-out (check ctx rand A)
+						      (go ['the (read-back-norm ctx
+										(THE (UNI)
+										     (val-of-closure B
+												     (val (ctx->env ctx)
+													  rand-out))))
+							  [rator-out rand-out]))
+					       else (stop rator (format "Expected a sigma pi, but this is a ~a"
+									(read-back-norm ctx (THE (UNI) else)))))))
+      ctx x => (go-on t (lookup-type x ctx)
+		      (go ['the (read-back-norm ctx (THE (UNI) t)) x]))
+      where (var? x)
+      ctx else => (stop e "Can't synthesize a type"))
+
+(func check
+      ctx ['cons a d] ['#SIGMA A D] => (go-on a-out (check ctx a A)
+					      d-out (check ctx d (val-of-closure D (val (ctx->env ctx) a-out)))
+					      (go ['cons a-out d-out]))
+      ctx 'zero ['#NAT] => (go 'zero)
+      ctx ['add1 n] ['#NAT] => (go-on n-out (check ctx n (NAT))
+				      (go ['add1 n-out]))
+      ctx 'same ['#EQ A from to] => (go-on _ (convert ctx A from to)
+					   (go 'same))
+      ctx 'sole ['#TRIVIAL] => (go 'sole)
+      ctx ['lambda x b] ['#PI A B] => (let x-val (NEU A (N-var x))
+					   (go-on b-out (check (extend-ctx ctx x A) b (val-of-closure B x-val))
+						  (go ['lambda x b-out])))
+      ctx ['quote a] ['#ATOM] => (go ['quote a])
+      ctx e t => (go-on ve (synth ctx e)
+			(match ve
+			       ['the t-out e-out]
+			       (go-on _ (convert ctx (UNI) t (val (ctx->env ctx) t-out))
+				      (go e-out)))))
+
+(defun convert (ctx t v1 v2)
+  (let e1 (read-back-norm ctx (THE t v1))
+       e2 (read-back-norm ctx (THE t v2))
+       (if (alpha-eq? e1 e2)
+	   (go 'ok)
+	 (stop e1 (format "expected to be the same ~v as ~v"
+			  (read-back-norm ctx (THE (UNI) t))
+			  e2)))))
+
+(func interact
+      ctx ['define x e] => (let find (assv x ctx)
+				(if (null? find)
+				    (stop x "Already defined")
+				  (go-on e1 (synth ctx e)
+					 (match e1
+						['the ty expr]
+						(let p (ctx->env ctx)
+						     (go (cons (cons x (def (val p ty) (val p expr))) ctx)))))))
+      ctx e => (go-on e1 (synth ctx e)
+		      (match e1 ['the ty expr]
+			     (let p (ctx->env ctx)
+				  (begin
+				   (display "Type: ~v Normal form: ~v\n")
+				   (display ty)
+				   (display (read-back-norm ctx (THE (val p ty)
+								     (val p expr))))
+				   (go ctx))))))
+
+(func run-program
+      ctx () => (go ctx)
+      ctx [d . rest] => (go-on ctx11 (interact ctx d)
+			       (run-program ctx1 rest)))
