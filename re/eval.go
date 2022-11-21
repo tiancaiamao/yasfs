@@ -507,6 +507,11 @@ func (c InstrCall) Exec(vm *VM) {
 func (c InstrCall) callCurry(vm *VM, curry *Curry) {
 	tmp := append(curry.Closed, vm.stack.underlying[vm.stack.pos-c.size+1:vm.stack.pos]...)
 	vm.stack.pos = vm.stack.pos - c.size
+
+	if curry.Prim != nil {
+		vm.stack.pos--
+	}
+
 	for _, v := range tmp {
 		vm.stack.Push(v)
 	}
