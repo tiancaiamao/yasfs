@@ -1,0 +1,167 @@
+(@import "cora/lib/sys")
+
+(func apply-subst
+      'int s => 'int
+      'bool s => 'bool
+      [a '-> b] s => [(apply-subst a s) '-> (apply-subst b s)]
+      ['list a] s => ['list (apply-subst a s)]
+      v s => (let find (assq v s)
+		  (if (null? find)
+		      v
+		      (cdr find))))
+
+;; (apply-subst '(4 -> int) '[[1 . int] [2 . bool] [3 . [int -> int]]])
+;; (apply-subst '6 '())
+;; (apply-subst '1 '())
+
+(func occur?
+      'int _ => false
+      'bool _ => false
+      [a '-> b] t => (or (occur? a t) (occur? b t))
+      ['list a] t => (occure? a t)
+      v t => (= v t))
+
+(defun unify (x y s)
+  (unify1 (apply-subst x s) (apply-subst y s) s))
+
+(func unify1
+      x y s => s where (= x y)
+      x y s => [[x . y] . s] where (and (number? x) (not (occur? x y)))
+      x y s => [[y . x] . s] where (and (number? y) (not (occur? y x)))
+      [a '-> b] [c '-> d] s => (let s1 (unify a c s)
+				 (unify b d s1))
+      ['list a] ['list b] s => (unify a b s))
+
+(set '*tvar* 1000)
+(defun tvar ()
+  (let ret *tvar*
+    (do (set '*tvar* (+ ret 1))
+	ret)))
+
+(defun extend (env v x)
+  (cons (cons v x) env))
+
+(func infer
+      x env s => ['int s] where (number? x)
+      x env s => ['bool s] where (boolean? x)
+      x env s => (let find (assq x env)
+		      (if (null? find)
+			  (error "variable not bound")
+			  [(cdr find) s])) where (symbol? x)
+      ['if e1 e2 e3] env s => (match (infer e1 env s)
+				[t1 s1]
+				(let s2 (unify 'bool t1 s1)
+				  (match (infer e2 env s2)
+				    [t2 s3]
+				    (match (infer e3 env s3)
+				      [t3 s4]
+				      [t2 (unify t2 t3 s4)]))))
+      ['/. x e] env s => (let tx (tvar)
+			   (match (infer e (extend env x tx) s)
+			     [te s1] [[tx '-> te] s1]))
+      [f g] env s => (match (infer f env s)
+		       [tf s1]
+		       (match (infer g env s1)
+			 [tg s2]
+			 (let tr (tvar)
+			   [tr (unify tf [tg '-> tr] s2)]))))
+
+(defun init-tenv ()
+  [['* . '(int -> (int -> int))]
+   ['+ . '(int -> (int -> int))]
+   ['- . '(int -> (int -> int))]
+   ['= . '(int -> (int -> bool))]
+   ['> . '(int -> (int -> bool))]])
+
+;; (infer '(if true 1 false) () ())   => fail
+;; (infer 1 () ()) => (int ())
+;; (infer '(/. x x) () ())
+;; (infer '(/. t (if true (/. x x) t)) '() '()) =>  ((1000 -> (1001 -> 1001)) ((1000 1001 -> 1001)))
+;; (infer '((/. x (/. y x)) 1) () ()) => (1005 ((1005 1004 -> int) (1003 . int)))
+;; (infer '((/. x (/. y y)) 1) () ())
+;; (infer '(/. x (/. y (if x 1 2))) (init-tenv) '())
+;; (infer '((+ 1) 2) (init-tenv) '())
+;; (infer '(/. f (/. g (f (g 1)))) () ())
+;; (infer '(/. f (/. x (f (x 1)))) () ()) =>  ((1000 -> (1001 -> 1003)) ((1000 1002 -> 1003) (1001 int -> 1002)))
+			 
+
+(func check-type
+      x t env s => (unify 'int t s) where (number? x)
+      x t env s => (unify 'bool t s) where (boolean? x)
+      x t env s => (let find (assq x env)
+		     (if (null? find)
+			 (error "variable not bound")
+			 (unify (cdr find) t s))) where (symbol? x)
+      () t env s => (let a (tvar)
+		      (unify t ['list a] s))
+      ['cons x y] t env s => (let a (tvar)
+			       (let s1 (check-type x a env s)
+				 (let s2 (unify t ['list a] s1)
+				   (check-type y ['list a] env s2))))
+      ['if e1 e2 e3] t env s => (let s1 (check-type e1 'bool env s)
+				  (let _ (check-type e2 t env s1)
+				    (check-type e3 t env s1)))
+      ['/. x e] [a '-> b] env s => (check-type e b (extend env x a) s)
+      [f g] b env s => (let a (tvar)
+			 (let s1 (check-type g a env s)
+			   (check-type f [a '-> b] env s1))))
+
+
+
+;; (check-type '((* 1) 0) 'int (init-tenv) ())
+;; (check-type '(/. x ((* 3) x)) '(int -> int) (init-tenv) ())
+;; (check-type '(/. x x) '(1 -> 1) () ())
+;; (check-type '(/. x (if true 0 1)) '(int -> int) () ())
+;; (check-type '((/. x (if ((= x) 5) 0 1)) 6) 'int (init-tenv) ())
+;; (check-type '(/. x (if ((= x) 0)
+;; 		       1
+;; 		     ((* x) (f ((- x) 1)))))
+;; 	    '(int -> int)
+;; 	    (extend (init-tenv) 'f '(int -> int))
+;; 	    ())
+;; (check-type '(cons 1 (cons 2 ())) '(list int) () ())
+;; (check-type '((remove 42) ()) '(list int)
+;; 	    (extend (init-tenv)
+;; 		    'remove '(1 -> ((list 1) -> (list 1))))
+;; 	    ())
+;; (check-type '((remove 42) (cons 3 (cons 7 ()))) '(list int)
+;; 	    (extend (init-tenv)
+;; 		    'remove '(1 -> ((list 1) -> (list 1))))
+;; 	    ())
+
+;; type check reverse function
+;; (check-type  '(/. x (/. y
+;; 			(if (null? x)
+;; 			    y
+;; 			  (if (cons? x)
+;; 			      ((reverse-h (cdr x)) (cons (car x) y))
+;; 			    ()))))
+;; 	     '((list 1) -> ((list 1) -> (list 1)))
+;; 	     (extend
+;; 	      (extend
+;; 	       (extend
+;; 		(extend
+;; 		 (extend
+;; 		  (init-tenv)
+;; 		  'null? '(2 -> bool))
+;; 		 'cons? '(3 -> bool))
+;; 		'car '((list 4) -> 4))
+;; 	       'cdr '((list 5) -> (list 5)))
+;; 	      'reverse-h '((list 1) -> ((list 1) -> (list 1))))
+;; 	     ())
+
+;; (check-type '(/. f (/. g (f (g 1))))
+;; 	    '((0 -> 1) -> ((int -> 0) -> 1))
+;; 	    () ())
+
+
+;; (infer '(/. x (if true (x 1) (x true))) () ())  => fail
+;; (check-type '(/. x (if true (x 1) (x true)))
+;; 	    '((1 -> 2) -> 2)
+;; 	    () ())                                 => ok
+;;
+;; This case is invalid for HM to infer 
+;; (infer '(/. f (/. x ((f (x 1)) (x true)))) () ())
+;;
+;; (infer '(/. f (/. x ((f (x (/. z z))) 
+;;      (x (/. u (/. v u)))))) () ())
