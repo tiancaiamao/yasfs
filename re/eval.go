@@ -71,9 +71,9 @@ type booleanObj bool
 func (b booleanObj) String() string {
 	switch b {
 	case True:
-		return "true"
+		return "True"
 	case False:
-		return "false"
+		return "False"
 	default:
 		panic("bool type error")
 	}
@@ -122,18 +122,28 @@ func init() {
 	symTrapError = MakeSymbol("trap-error")
 	symSimpleError = MakeSymbol("simple-error")
 
-	symTry := MakeSymbol("try")
-	symTry.val = &Closure{
-		Required: 2,
-		Code:     instrFunc(instrForTry),
-		Slot:     nil,
-	}
-	symThrow := MakeSymbol("throw")
-	symThrow.val = &Closure{
-		Required: 3,
-		Code:     instrFunc(instrForThrow),
-		Slot:     nil,
-	}
+	MakeSymbol("car").val = primCar
+	MakeSymbol("cdr").val = primCdr
+	MakeSymbol("cons").val = primCons
+	MakeSymbol("+").val = primAdd
+	MakeSymbol("-").val = primSub
+	MakeSymbol("*").val = primMul
+	MakeSymbol("/").val = primDiv
+	MakeSymbol("=").val = primEQ
+	MakeSymbol("set").val = primSet
+
+	// symTry := MakeSymbol("try")
+	// symTry.val = &Closure{
+	// 	Required: 2,
+	// 	Code:     instrFunc(instrForTry),
+	// 	Slot:     nil,
+	// }
+	// symThrow := MakeSymbol("throw")
+	// symThrow.val = &Closure{
+	// 	Required: 3,
+	// 	Code:     instrFunc(instrForThrow),
+	// 	Slot:     nil,
+	// }
 }
 
 func MakeSymbol(str string) *Symbol {
@@ -184,15 +194,26 @@ func printCons(to io.Writer, o Obj, start bool) {
 	}
 }
 
+// type Closure struct {
+// 	Required int
+// 	Code     Instr
+// 	Parent   *Closure
+// 	Slot     map[int]Obj
+// }
+
 type Closure struct {
+	closed []Obj
+	code func(vm *VM)
 	Required int
-	Code     Instr
-	Parent   *Closure
-	Slot     map[int]Obj
+	Name string
 }
 
 func (c *Closure) String() string {
-	return "#0closure"
+	ret := "#closure"
+	if c.Name != "" {
+		ret += c.Name
+	}
+	return ret
 }
 
 type Curry struct {
@@ -250,19 +271,22 @@ func (c *Primitive) String() string {
 // 	VM and instructions
 // =======================================
 
+type returnAddr struct {
+	pc func(*VM)
+	base int
+	pos int
+}
+
 type VM struct {
-	pc    Instr
-	stack stackFrame
+	next  func(*VM)
+	stack []Obj
+	base int
 	val   Obj
+	callStack []returnAddr
 }
 
 func New() *VM {
-	var initializeStack [2048]Obj
-	return &VM{
-		stack: stackFrame{
-			underlying: &initializeStack,
-		},
-	}
+	return &VM{}
 }
 
 type stackFrame struct {
@@ -300,33 +324,36 @@ func (sf *stackFrame) Resize(n int) {
 }
 
 func (vm *VM) push(v Obj) {
-	vm.stack.Push(v)
+	// vm.stack.Push(v)
 }
 
 func (vm *VM) pop() Obj {
-	return vm.stack.Pop()
+	ret := vm.stack[len(vm.stack) - 1]
+	vm.stack = vm.stack[:len(vm.stack) - 1]
+	return ret
 }
 
-func (vm *VM) Return(x Obj) {
-	cc := vm.stack.Get(0)
-	cont := cc.(Continuation)
+func (vm *VM) ret(x Obj) {
 	vm.val = x
-	vm.stack = cont.Stack
-	vm.pc = cont.Code
+	ret := vm.callStack[len(vm.callStack)-1]
+	vm.callStack = vm.callStack[:len(vm.callStack)-1]
+	vm.base = ret.base
+	vm.stack = vm.stack[:ret.pos]
+	vm.next = ret.pc
 }
 
-func (vm *VM) run(code Instr) {
-	cc := Continuation{
-		Stack: vm.stack,
-		Code:  nil,
-	}
-	vm.stack.base = vm.stack.pos
-	vm.push(cc)
+// func (vm *VM) run(code Instr) {
+// 	cc := Continuation{
+// 		Stack: vm.stack,
+// 		Code:  nil,
+// 	}
+// 	vm.stack.base = vm.stack.pos
+// 	vm.push(cc)
 
-	for vm.pc = code; vm.pc != nil; {
-		vm.pc.Exec(vm)
-	}
-}
+// 	for vm.pc = code; vm.pc != nil; {
+// 		vm.pc.Exec(vm)
+// 	}
+// }
 
 var _ Instr = InstrConst{}
 var _ Instr = InstrIf{}
@@ -337,8 +364,6 @@ var _ Instr = InstrClosureRef{}
 var _ Instr = InstrGlobalRef{}
 var _ Instr = InstrPrimitive{}
 var _ Instr = InstrCall{}
-
-// var _ Instr = InstrSet{}
 var _ Instr = InstrPrepareCall{}
 var _ Instr = InstrMakeClosure{}
 var _ Instr = InstrExit{}
@@ -350,7 +375,7 @@ type Instr interface {
 type InstrExit struct{}
 
 func (_ InstrExit) Exec(vm *VM) {
-	vm.Return(vm.val)
+	// vm.Return(vm.val)
 }
 
 type InstrConst struct {
@@ -360,7 +385,7 @@ type InstrConst struct {
 
 func (c InstrConst) Exec(vm *VM) {
 	vm.val = c.Val
-	vm.pc = c.Next
+	// vm.pc = c.Next
 }
 
 type InstrGlobalRef struct {
@@ -373,7 +398,7 @@ func (i InstrGlobalRef) Exec(vm *VM) {
 		panic("undefined symbol:" + i.sym.str)
 	}
 	vm.val = i.sym.val
-	vm.pc = i.Next
+	// vm.pc = i.Next
 }
 
 // type InstrSet struct {
@@ -393,7 +418,7 @@ type InstrNop struct {
 }
 
 func (i InstrNop) Exec(vm *VM) {
-	vm.pc = i.Next
+	// vm.pc = i.Next
 }
 
 type InstrPush struct {
@@ -402,7 +427,7 @@ type InstrPush struct {
 
 func (i InstrPush) Exec(vm *VM) {
 	vm.push(vm.val)
-	vm.pc = i.Next
+	// vm.pc = i.Next
 }
 
 type InstrLocalRef struct {
@@ -411,9 +436,9 @@ type InstrLocalRef struct {
 }
 
 func (i InstrLocalRef) Exec(vm *VM) {
-	v := vm.stack.Get(i.Idx + 2)
-	vm.val = v
-	vm.pc = i.Next
+	// v := vm.stack.Get(i.Idx + 2)
+	// vm.val = v
+	// vm.pc = i.Next
 }
 
 type InstrClosureRef struct {
@@ -423,14 +448,14 @@ type InstrClosureRef struct {
 }
 
 func (i InstrClosureRef) Exec(vm *VM) {
-	tmp := vm.stack.Get(1)
-	clo := tmp.(*Closure)
-	for v := i.Up; v > 0; v-- {
-		clo = clo.Parent
-	}
+	// tmp := vm.stack.Get(1)
+	// clo := tmp.(*Closure)
+	// for v := i.Up; v > 0; v-- {
+	// 	clo = clo.Parent
+	// }
 
-	vm.val = clo.Slot[i.Idx]
-	vm.pc = i.Next
+	// vm.val = clo.Slot[i.Idx]
+	// vm.pc = i.Next
 }
 
 type InstrIf struct {
@@ -441,9 +466,9 @@ type InstrIf struct {
 func (i InstrIf) Exec(vm *VM) {
 	switch vm.val {
 	case True:
-		vm.pc = i.Then
+		// vm.pc = i.Then
 	case False:
-		vm.pc = i.Else
+		// vm.pc = i.Else
 	default:
 		panic("if instr accept only true and false")
 	}
@@ -457,24 +482,24 @@ type InstrMakeClosure struct {
 }
 
 func (i InstrMakeClosure) Exec(vm *VM) {
-	var parent *Closure
-	if raw, ok := vm.stack.Get(1).(*Closure); ok {
-		parent = raw
-	}
-	var slot map[int]Obj
-	if len(i.closed) > 0 {
-		slot = make(map[int]Obj, len(i.closed))
-		for _, off := range i.closed {
-			slot[off] = vm.stack.Get(off + 2)
-		}
-	}
-	vm.val = &Closure{
-		Required: i.required,
-		Code:     i.code,
-		Slot:     slot,
-		Parent:   parent,
-	}
-	vm.pc = i.Next
+	// var parent *Closure
+	// if raw, ok := vm.stack.Get(1).(*Closure); ok {
+	// 	parent = raw
+	// }
+	// var slot map[int]Obj
+	// if len(i.closed) > 0 {
+	// 	slot = make(map[int]Obj, len(i.closed))
+	// 	for _, off := range i.closed {
+	// 		slot[off] = vm.stack.Get(off + 2)
+	// 	}
+	// }
+	// vm.val = &Closure{
+	// 	Required: i.required,
+	// 	Code:     i.code,
+	// 	Slot:     slot,
+	// 	Parent:   parent,
+	// }
+	// vm.pc = i.Next
 }
 
 type InstrPrepareCall struct {
@@ -484,7 +509,7 @@ type InstrPrepareCall struct {
 func (c InstrPrepareCall) Exec(vm *VM) {
 	// This slot is reserved for continuation
 	vm.push(Nil)
-	vm.pc = c.next
+	// vm.pc = c.next
 }
 
 type InstrCall struct {
@@ -493,126 +518,126 @@ type InstrCall struct {
 }
 
 func (c InstrCall) Exec(vm *VM) {
-	fn := vm.stack.Get(-c.size)
-	switch raw := fn.(type) {
-	case *Closure:
-		c.callClosure(vm, raw)
-	case *Curry:
-		c.callCurry(vm, raw)
-	default:
-		panic("can't call " + fn.String())
-	}
+	// fn := vm.stack.Get(-c.size)
+	// switch raw := fn.(type) {
+	// case *Closure:
+	// 	c.callClosure(vm, raw)
+	// case *Curry:
+	// 	c.callCurry(vm, raw)
+	// default:
+	// 	panic("can't call " + fn.String())
+	// }
 }
 
 func (c InstrCall) callCurry(vm *VM, curry *Curry) {
-	tmp := append(curry.Closed, vm.stack.underlying[vm.stack.pos-c.size+1:vm.stack.pos]...)
-	vm.stack.pos = vm.stack.pos - c.size
+	// tmp := append(curry.Closed, vm.stack.underlying[vm.stack.pos-c.size+1:vm.stack.pos]...)
+	// vm.stack.pos = vm.stack.pos - c.size
 
-	if curry.Prim != nil {
-		vm.stack.pos--
-	}
+	// if curry.Prim != nil {
+	// 	vm.stack.pos--
+	// }
 
-	for _, v := range tmp {
-		vm.stack.Push(v)
-	}
+	// for _, v := range tmp {
+	// 	vm.stack.Push(v)
+	// }
 
-	if curry.Prim != nil {
-		vm.pc = InstrPrimitive{
-			size: len(tmp),
-			prim: curry.Prim,
-			Next: c.Next,
-		}
-	} else {
-		vm.pc = InstrCall{
-			size: len(tmp),
-			Next: c.Next,
-		}
-	}
+	// if curry.Prim != nil {
+	// 	vm.pc = InstrPrimitive{
+	// 		size: len(tmp),
+	// 		prim: curry.Prim,
+	// 		Next: c.Next,
+	// 	}
+	// } else {
+	// 	vm.pc = InstrCall{
+	// 		size: len(tmp),
+	// 		Next: c.Next,
+	// 	}
+	// }
 }
 
 func (c InstrCall) callClosure(vm *VM, clo *Closure) {
-	argc := c.size - 1
-	switch {
-	case argc == clo.Required:
-		c.callClosureNormal(vm, clo)
-	case argc < clo.Required:
-		vm.val = &Curry{
-			Required: clo.Required - argc,
-			Closed:   append([]Obj{}, vm.stack.underlying[vm.stack.pos-c.size:vm.stack.pos]...),
-		}
-		vm.stack.Resize(vm.stack.pos - c.size - 1 - vm.stack.base)
-		if c.Next == nil {
-			panic("call closure")
-		} else {
-			vm.pc = c.Next
-		}
-	case argc > clo.Required:
-		c.callClosurePartial(vm, clo)
-	}
+	// argc := c.size - 1
+	// switch {
+	// case argc == clo.Required:
+	// 	c.callClosureNormal(vm, clo)
+	// case argc < clo.Required:
+	// 	vm.val = &Curry{
+	// 		Required: clo.Required - argc,
+	// 		Closed:   append([]Obj{}, vm.stack.underlying[vm.stack.pos-c.size:vm.stack.pos]...),
+	// 	}
+	// 	vm.stack.Resize(vm.stack.pos - c.size - 1 - vm.stack.base)
+	// 	if c.Next == nil {
+	// 		panic("call closure")
+	// 	} else {
+	// 		vm.pc = c.Next
+	// 	}
+	// case argc > clo.Required:
+	// 	c.callClosurePartial(vm, clo)
+	// }
 }
 
 func (c InstrCall) callClosureNormal(vm *VM, raw *Closure) {
-	code := raw.Code
-	if c.Next == nil {
-		panic("now never here?")
-	} else if c.Next == identity { // Jump
-		// Reuse the old stack.
-		for i := 0; i < c.size; i++ {
-			arg := vm.stack.Get(-c.size + i)
-			vm.stack.Set(i+1, arg)
-		}
-		vm.stack.Resize(c.size + 1)
-	} else { // Call
-		newStackBase := vm.stack.pos - c.size - 1
-		// Save the old stack and save the Next instr.
-		//  After the call, the function return to here.
-		cc := Continuation{
-			Stack: stackFrame{
-				underlying: vm.stack.underlying,
-				base:       vm.stack.base,
-				pos:        newStackBase,
-			},
-			Code: c.Next,
-		}
+	// code := raw.Code
+	// if c.Next == nil {
+	// 	panic("now never here?")
+	// } else if c.Next == identity { // Jump
+	// 	// Reuse the old stack.
+	// 	for i := 0; i < c.size; i++ {
+	// 		arg := vm.stack.Get(-c.size + i)
+	// 		vm.stack.Set(i+1, arg)
+	// 	}
+	// 	vm.stack.Resize(c.size + 1)
+	// } else { // Call
+	// 	newStackBase := vm.stack.pos - c.size - 1
+	// 	// Save the old stack and save the Next instr.
+	// 	//  After the call, the function return to here.
+	// 	cc := Continuation{
+	// 		Stack: stackFrame{
+	// 			underlying: vm.stack.underlying,
+	// 			base:       vm.stack.base,
+	// 			pos:        newStackBase,
+	// 		},
+	// 		Code: c.Next,
+	// 	}
 
-		// Change to the new stack.
-		vm.stack.base = newStackBase
-		vm.stack.Set(0, cc)
-	}
-	// change current pc to the callee
-	vm.pc = code
+	// 	// Change to the new stack.
+	// 	vm.stack.base = newStackBase
+	// 	vm.stack.Set(0, cc)
+	// }
+	// // change current pc to the callee
+	// vm.pc = code
 }
 
 func (c InstrCall) callClosurePartial(vm *VM, clo *Closure) {
-	// prepare a new stack for call
-	cc := Continuation{
-		Stack: vm.stack,
-		Code:  nil,
-	}
-	newBase := vm.stack.pos
-	vm.push(cc)
-	for i := 0; i < clo.Required+1; i++ {
-		vm.push(vm.stack.Get(i + 2))
-	}
-	vm.stack.base = newBase
+	// // prepare a new stack for call
+	// cc := Continuation{
+	// 	Stack: vm.stack,
+	// 	Code:  nil,
+	// }
+	// newBase := vm.stack.pos
+	// vm.push(cc)
+	// for i := 0; i < clo.Required+1; i++ {
+	// 	vm.push(vm.stack.Get(i + 2))
+	// }
+	// vm.stack.base = newBase
 
-	// Call partial
-	for vm.pc = clo.Code; vm.pc != nil; {
-		vm.pc.Exec(vm)
-	}
+	// // Call partial
+	// for vm.pc = clo.Code; vm.pc != nil; {
+	// 	vm.pc.Exec(vm)
+	// }
 
-	// Handle the remain call
-	vm.stack.Set(2, vm.val)
-	for i := 0; i < c.size-1-clo.Required; i++ {
-		vm.stack.Set(i+3, vm.stack.Get(i+3+clo.Required))
-	}
-	vm.stack.Resize(c.size - clo.Required + 2)
+	// // Handle the remain call
+	// vm.stack.Set(2, vm.val)
+	// for i := 0; i < c.size-1-clo.Required; i++ {
+	// 	vm.stack.Set(i+3, vm.stack.Get(i+3+clo.Required))
+	// }
+	// vm.stack.Resize(c.size - clo.Required + 2)
 
-	c1 := InstrCall{
-		size: c.size - clo.Required,
-		Next: c.Next,
-	}
-	vm.pc = c1
+	// c1 := InstrCall{
+	// 	size: c.size - clo.Required,
+	// 	Next: c.Next,
+	// }
+	// vm.pc = c1
 }
 
 type InstrPrimitive struct {
@@ -622,26 +647,26 @@ type InstrPrimitive struct {
 }
 
 func (c InstrPrimitive) Exec(vm *VM) {
-	raw := c.prim
-	if c.size == raw.Required {
-		// Execute the primitive
-		raw.Exec(vm)
-	} else if c.size < raw.Required {
-		vm.val = &Curry{
-			Required: raw.Required - c.size,
-			Closed:   append([]Obj{}, vm.stack.underlying[vm.stack.pos-c.size:vm.stack.pos]...),
-			Prim:     c.prim,
-		}
-		vm.stack.Resize(vm.stack.pos - c.size - vm.stack.base)
-	} else {
-		panic("call primitive argc not match")
-	}
+	// raw := c.prim
+	// if c.size == raw.Required {
+	// 	// Execute the primitive
+	// 	raw.Exec(vm)
+	// } else if c.size < raw.Required {
+	// 	vm.val = &Curry{
+	// 		Required: raw.Required - c.size,
+	// 		Closed:   append([]Obj{}, vm.stack.underlying[vm.stack.pos-c.size:vm.stack.pos]...),
+	// 		Prim:     c.prim,
+	// 	}
+	// 	vm.stack.Resize(vm.stack.pos - c.size - vm.stack.base)
+	// } else {
+	// 	panic("call primitive argc not match")
+	// }
 
-	if c.Next == nil { // Jump
-		vm.Return(vm.val)
-	} else { // Call
-		vm.pc = c.Next
-	}
+	// if c.Next == nil { // Jump
+	// 	vm.Return(vm.val)
+	// } else { // Call
+	// 	vm.pc = c.Next
+	// }
 }
 
 // =====================================
@@ -772,98 +797,102 @@ func (c *Compiler) compileLambda(args, body Obj, env *Env, cont Instr) Instr {
 }
 
 func (c *Compiler) compileCall(exp Obj, env *Env, cont Instr) Instr {
-	if sym, ok := car(exp).(*Symbol); ok {
-		remain := cdr(exp)
-		switch sym.str {
-		case "car":
-			return c.compileList(remain, env, InstrPrimitive{
-				size: listLength(remain),
-				prim: primCar,
-				Next: cont,
-			})
-		case "cdr":
-			return c.compileList(remain, env, InstrPrimitive{
-				size: listLength(remain),
-				prim: primCdr,
-				Next: cont,
-			})
-		case "cons":
-			return c.compileList(remain, env, InstrPrimitive{
-				size: listLength(remain),
-				prim: primCons,
-				Next: cont,
-			})
-		case "+":
-			return c.compileList(remain, env, InstrPrimitive{
-				size: listLength(remain),
-				prim: primAdd,
-				Next: cont,
-			})
-		case "-":
-			return c.compileList(remain, env, InstrPrimitive{
-				size: listLength(remain),
-				prim: primSub,
-				Next: cont,
-			})
-		case "=":
-			return c.compileList(remain, env, InstrPrimitive{
-				size: listLength(remain),
-				prim: primEQ,
-				Next: cont,
-			})
-		case "*":
-			return c.compileList(remain, env, InstrPrimitive{
-				size: listLength(remain),
-				prim: primMul,
-				Next: cont,
-			})
-		case "/":
-			return c.compileList(remain, env, InstrPrimitive{
-				size: listLength(remain),
-				prim: primDiv,
-				Next: cont,
-			})
-		case "set":
-			return c.compileList(remain, env, InstrPrimitive{
-				size: listLength(remain),
-				prim: primSet,
-				Next: cont,
-			})
-		case "value":
-			return c.compileList(remain, env, InstrPrimitive{
-				size: listLength(remain),
-				prim: primValue,
-				Next: cont,
-			})
-			// default:
-			// 	size := listLength(exp)
-			// 	return InstrPrepareCall{
-			// 		next: c.compileSymbol(sym, env, true, InstrPush{
-			// 			Next: c.compileList(remain, env, InstrCall{
-			// 				size: size,
-			// 				Next: cont,
-			// 			}),
-			// 		}),
-			// 	}
-		}
-	}
-	size := listLength(exp)
-	return InstrPrepareCall{
-		next: c.compileList(exp, env, InstrCall{
-			size: size,
-			Next: cont,
-		}),
-	}
+	return cont
 }
 
-func (c *Compiler) compileList(exp Obj, env *Env, cont Instr) Instr {
-	if exp == Nil {
-		return cont
-	}
-	return c.compile(car(exp), env, InstrPush{
-		Next: c.compileList(cdr(exp), env, cont),
-	})
-}
+// func (c *Compiler) compileCall(exp Obj, env *Env, cont Instr) Instr {
+// 	if sym, ok := car(exp).(*Symbol); ok {
+// 		remain := cdr(exp)
+// 		switch sym.str {
+// 		case "car":
+// 			return c.compileList(remain, env, InstrPrimitive{
+// 				size: listLength(remain),
+// 				prim: primCar,
+// 				Next: cont,
+// 			})
+// 		case "cdr":
+// 			return c.compileList(remain, env, InstrPrimitive{
+// 				size: listLength(remain),
+// 				prim: primCdr,
+// 				Next: cont,
+// 			})
+// 		case "cons":
+// 			return c.compileList(remain, env, InstrPrimitive{
+// 				size: listLength(remain),
+// 				prim: primCons,
+// 				Next: cont,
+// 			})
+// 		case "+":
+// 			return c.compileList(remain, env, InstrPrimitive{
+// 				size: listLength(remain),
+// 				prim: primAdd,
+// 				Next: cont,
+// 			})
+// 		case "-":
+// 			return c.compileList(remain, env, InstrPrimitive{
+// 				size: listLength(remain),
+// 				prim: primSub,
+// 				Next: cont,
+// 			})
+// 		case "=":
+// 			return c.compileList(remain, env, InstrPrimitive{
+// 				size: listLength(remain),
+// 				prim: primEQ,
+// 				Next: cont,
+// 			})
+// 		case "*":
+// 			return c.compileList(remain, env, InstrPrimitive{
+// 				size: listLength(remain),
+// 				prim: primMul,
+// 				Next: cont,
+// 			})
+// 		case "/":
+// 			return c.compileList(remain, env, InstrPrimitive{
+// 				size: listLength(remain),
+// 				prim: primDiv,
+// 				Next: cont,
+// 			})
+// 		case "set":
+// 			return c.compileList(remain, env, InstrPrimitive{
+// 				size: listLength(remain),
+// 				prim: primSet,
+// 				Next: cont,
+// 			})
+// 		case "value":
+// 			return c.compileList(remain, env, InstrPrimitive{
+// 				size: listLength(remain),
+// 				prim: primValue,
+// 				Next: cont,
+// 			})
+// 			// default:
+// 			// 	size := listLength(exp)
+// 			// 	return InstrPrepareCall{
+// 			// 		next: c.compileSymbol(sym, env, true, InstrPush{
+// 			// 			Next: c.compileList(remain, env, InstrCall{
+// 			// 				size: size,
+// 			// 				Next: cont,
+// 			// 			}),
+// 			// 		}),
+// 			// 	}
+// 		}
+// 	}
+// 	size := listLength(exp)
+// 	return InstrPrepareCall{
+// 		next: c.compileList(exp, env, InstrCall{
+// 			size: size,
+// 			Next: cont,
+// 		}),
+// 	}
+// }
+
+// func (c *Compiler) compileList(exp Obj, env *Env, cont Instr) Instr {
+// 	if exp == Nil {
+// 		return cont
+// 	}
+// 	return c.compile(car(exp), env, InstrPush{
+// 		Next: c.compileList(cdr(exp), env, cont),
+// 	})
+// }
 
 // ==================================
 // 	Library and primitive functions
@@ -907,120 +936,132 @@ func listLength(l Obj) int {
 	return count
 }
 
+func sliceToList(s []Obj) Obj {
+	ret := Nil
+	for i:=len(s)-1; i>=0; i-- {
+		x := s[i]
+		ret = cons(x, ret)
+	}
+	return ret
+}
+
 func (vm *VM) Eval(exp Obj) Obj {
 	return eval(vm, exp)
 }
 
-func eval(vm *VM, exp Obj) Obj {
-	var c Compiler
-	code := c.compile(exp, nil, identity)
-	//	fmt.Printf("the code is: %#v\n", code)
-	vm.run(code)
-	ret := vm.val
-
-	// fmt.Println("after eval, the stack ==", vm.stack.base, vm.stack.pos)
-
-	return ret
+func trampoline(vm *VM, code func(*VM)) {
+	vm.next = code
+	for vm.next != nil {
+		code = vm.next
+		vm.next = nil
+		code(vm)
+	}
 }
 
-var primSet = &Primitive{
-	Exec: func(vm *VM) {
+func eval(vm *VM, exp Obj) Obj {
+	code := newCompile(exp, Nil, nil, func(vm *VM){})
+	trampoline(vm, code)
+	return vm.val
+}
+
+var primSet = &Closure{
+	code: func(vm *VM) {
 		val := vm.pop()
 		key := vm.pop()
 		key.(*Symbol).val = val
-		vm.val = val
+		vm.ret(val)
 	},
 	Required: 2,
 	Name:     "Set",
 }
 
-var primValue = &Primitive{
-	Exec: func(vm *VM) {
+var primValue = &Closure{
+	code: func(vm *VM) {
 		key := vm.pop()
 		val := key.(*Symbol).val
-		vm.val = val
+		vm.ret(val)
 	},
 	Required: 1,
 	Name:     "Value",
 }
 
 
-var primCar = &Primitive{
-	Exec: func(vm *VM) {
+var primCar = &Closure{
+	code: func(vm *VM) {
 		y := vm.pop()
-		vm.val = car(y)
+		vm.ret(car(y))
 	},
 	Required: 1,
 	Name:     "car",
 }
 
-var primCdr = &Primitive{
-	Exec: func(vm *VM) {
+var primCdr = &Closure{
+	code: func(vm *VM) {
 		y := vm.pop()
-		vm.val = cdr(y)
+		vm.ret(cdr(y))
 	},
 	Required: 1,
 	Name:     "cdr",
 }
 
-var primCons = &Primitive{
-	Exec: func(vm *VM) {
+var primCons = &Closure{
+	code: func(vm *VM) {
 		x := vm.pop()
 		y := vm.pop()
-		vm.val = cons(y, x)
+		vm.ret(cons(y, x))
 	},
 	Required: 2,
 	Name:     "cdr",
 }
 
-var primAdd = &Primitive{
-	Exec: func(vm *VM) {
+var primAdd = &Closure{
+	code: func(vm *VM) {
 		x := vm.pop().(Integer)
 		y := vm.pop().(Integer)
-		vm.val = Integer(x + y)
+		vm.ret(Integer(x + y))
 	},
 	Required: 2,
 	Name:     "Add",
 }
 
-var primSub = &Primitive{
-	Exec: func(vm *VM) {
+var primSub = &Closure{
+	code: func(vm *VM) {
 		x := vm.pop().(Integer)
 		y := vm.pop().(Integer)
-		vm.val = Integer(y - x)
+		vm.ret(Integer(y - x))
 	},
 	Required: 2,
 	Name:     "Sub",
 }
 
-var primMul = &Primitive{
-	Exec: func(vm *VM) {
+var primMul = &Closure{
+	code: func(vm *VM) {
 		x := vm.pop().(Integer)
 		y := vm.pop().(Integer)
-		vm.val = Integer(x * y)
+		vm.ret(Integer(x * y))
 	},
 	Required: 2,
 	Name:     "Mul",
 }
 
-var primDiv = &Primitive{
-	Exec: func(vm *VM) {
+var primDiv = &Closure{
+	code: func(vm *VM) {
 		x := vm.pop().(Integer)
 		y := vm.pop().(Integer)
-		vm.val = Integer(y / x)
+		vm.ret(Integer(y / x))
 	},
 	Required: 2,
 	Name:     "Div",
 }
 
-var primEQ = &Primitive{
-	Exec: func(vm *VM) {
+var primEQ = &Closure{
+	code: func(vm *VM) {
 		x := vm.pop()
 		y := vm.pop()
 		if x == y {
-			vm.val = True
+			vm.ret(True)
 		} else {
-			vm.val = False
+			vm.ret(False)
 		}
 	},
 	Required: 2,
@@ -1041,26 +1082,26 @@ func (f instrFunc) Exec(vm *VM) {
 }
 
 func instrForTry(vm *VM) {
-	cc := vm.stack.Get(0)
+	// cc := vm.stack.Get(0)
 	// self :=  vm.stack.Get(1) the 'try' closure itself.
-	thunk := vm.stack.Get(2).(*Closure)
-	handler := vm.stack.Get(3)
+	// thunk := vm.stack.Get(2).(*Closure)
+	// handler := vm.stack.Get(3)
 
-	// Create a new heap allocated frame.
-	var arr [2048]Obj
-	newStack := stackFrame{
-		underlying: &arr,
-	}
+	// // Create a new heap allocated frame.
+	// var arr [2048]Obj
+	// newStack := stackFrame{
+	// 	underlying: &arr,
+	// }
 
-	// Prepare the call for the chunk.
-	newStack.Push(cc)      // saved return address
-	newStack.Push(thunk)   // callee: the chunk itself
-	newStack.Push(cc)      // cc as the first argument for thunk
-	newStack.Push(handler) // handler as the second parameter for thunk
+	// // Prepare the call for the chunk.
+	// newStack.Push(cc)      // saved return address
+	// newStack.Push(thunk)   // callee: the chunk itself
+	// newStack.Push(cc)      // cc as the first argument for thunk
+	// newStack.Push(handler) // handler as the second parameter for thunk
 
-	// Call the chunk, cc and handler is passed as the parameter.
-	vm.stack = newStack
-	vm.pc = thunk.Code
+	// // Call the chunk, cc and handler is passed as the parameter.
+	// vm.stack = newStack
+	// vm.pc = thunk.Code
 }
 
 /*
@@ -1092,34 +1133,185 @@ func macroExpand(vm *VM, exp Obj) Obj {
 type savedContAsClosure Continuation
 
 func (s savedContAsClosure) Exec(vm *VM) {
-	val := vm.stack.Get(2)
-	vm.stack = s.Stack
-	vm.pc = s.Code
-	vm.val = val
+	// val := vm.stack.Get(2)
+	// vm.stack = s.Stack
+	// vm.pc = s.Code
+	// vm.val = val
 }
 
 func instrForThrow(vm *VM) {
-	cc := vm.stack.Get(0).(Continuation)
-	v := vm.stack.Get(2)
-	oldCC := vm.stack.Get(3).(Continuation)
-	handler := vm.stack.Get(4).(*Closure)
+	// cc := vm.stack.Get(0).(Continuation)
+	// v := vm.stack.Get(2)
+	// oldCC := vm.stack.Get(3).(Continuation)
+	// handler := vm.stack.Get(4).(*Closure)
 
-	// Wrap the current stack into a closure.
-	fn := &Closure{
-		Required: 1,
-		Code:     savedContAsClosure(cc),
+	// // Wrap the current stack into a closure.
+	// fn := &Closure{
+	// 	Required: 1,
+	// 	Code:     savedContAsClosure(cc),
+	// }
+
+	// // Long jump to the call site of 'try'.
+	// vm.stack = oldCC.Stack
+
+	// // New stack.
+	// vm.stack.base = vm.stack.pos
+
+	// // Call the handler function.
+	// vm.push(oldCC)
+	// vm.push(handler)
+	// vm.push(v)
+	// vm.push(fn)
+	// vm.pc = handler.Code
+}
+
+
+func findFrees(exp Obj, env Obj, ret []Obj) []Obj {
+	switch exp.(type) {
+	case nilObj, booleanObj, Integer, String, Float64:
+		return ret
+	case *Symbol:
+		for env != Nil {
+			x := car(env)
+			for x != Nil {
+				if car(x) == exp {
+					return ret
+				}
+				x = cdr(x)
+			}
+			env = cdr(env)
+		}
+		ret = append(ret, exp)
+		return ret
+	}
+	raw := exp.(*Cons)
+	switch raw.car {
+	case symQuote:
+	case symIf:
+		ret = findFrees(cadr(exp), env, ret)
+		ret = findFrees(caddr(exp), env, ret)
+		ret = findFrees(caddr(cdr(exp)), env, ret)
+	case symDo:
+		ret = findFrees(cadr(exp), env, ret)
+		ret = findFrees(caddr(exp), env, ret)
+	case symLambda:
+		args := cadr(exp)
+		body := caddr(exp)
+		ret = findFrees(body, cons(args, env), ret)
+	}
+	return ret
+}
+
+func assq(v, list Obj) int {
+	idx := 0
+	for list != Nil {
+		if car(list) == v {
+			return idx
+		}
+		idx++
+		list = cdr(list)
+	}
+	return -1
+}
+
+func newCompile(exp Obj, locals Obj, frees []Obj, next func(*VM)) func(vm *VM) {
+	switch raw := exp.(type) {
+	case nilObj, booleanObj, Integer, String, Float64:
+		return func(vm *VM) {
+			vm.val = exp
+			vm.next = next
+		}
+	case *Symbol:
+		idx := assq(exp, locals)
+		if idx >= 0 {
+			return func(vm *VM) {
+				// fmt.Println("localref", exp, idx, vm.base)
+				vm.val = vm.stack[vm.base + idx + 1]
+				vm.next = next
+			}
+		}
+		for i, v := range frees {
+			if v == exp {
+				return func(vm *VM) {
+					closure := vm.stack[vm.base].(*Closure)
+					vm.val = closure.closed[i]
+				}
+			}
+		}
+		return func(vm *VM) {
+			if raw.val == nil {
+				panic("undefined symbol:" + raw.str)
+			}
+			vm.val = raw.val
+			vm.next = next
+		}
 	}
 
-	// Long jump to the call site of 'try'.
-	vm.stack = oldCC.Stack
+	raw := exp.(*Cons)
+	switch raw.car {
+	case symQuote:
+		return func(vm *VM) {
+			vm.val = car(raw.cdr)
+			vm.next = next
+		}
+	case symIf:
+		thenCont := newCompile(cadr(raw.cdr), locals, frees, next)
+		elseCont := newCompile(caddr(raw.cdr), locals, frees, next)
+		return newCompile(car(raw.cdr), locals, frees, func(vm *VM) {
+			switch (vm.val) {
+			case True:
+				thenCont(vm)
+			case False:
+				elseCont(vm)
+			default:
+				panic("if need to be true / false")
+			}
+		})
+	case symDo:
+		y := newCompile(caddr(raw), locals, frees, next)
+		return newCompile(cadr(raw), locals, frees, func(vm *VM) {
+			y(vm)
+		})
+	case symLambda:
+		args := cadr(exp)
+		body := caddr(exp)
+		frees1 := findFrees(exp, Nil, nil)
+		code := newCompile(body, args, frees1, func(vm *VM) {
+			vm.ret(vm.val)
+		})
+		return compileList(sliceToList(frees1), locals, frees, func(vm *VM) {
+			vm.val = &Closure{
+				closed: append([]Obj{}, vm.stack[len(vm.stack)-len(frees1):]...),
+				code: code,
+			}
+			vm.next = next
+		})
+	}
 
-	// New stack.
-	vm.stack.base = vm.stack.pos
+	// compile call
+	nargs := listLength(exp)
+	return compileList(exp, locals, frees, func(vm *VM) {
+		// save the stack
+		newBase := len(vm.stack)-nargs
+		vm.callStack = append(vm.callStack, returnAddr{
+			pc: next,
+			base: vm.base,
+			pos: newBase,
+		})
 
-	// Call the handler function.
-	vm.push(oldCC)
-	vm.push(handler)
-	vm.push(v)
-	vm.push(fn)
-	vm.pc = handler.Code
+		// make the call
+		fn := vm.stack[newBase].(*Closure)
+		vm.base = newBase
+		vm.next = fn.code
+	})
+}
+
+func compileList(exp Obj, locals Obj, frees []Obj, next func(*VM)) func(*VM) {
+	if exp == Nil {
+		return next
+	}
+	return newCompile(car(exp), locals, frees, func(vm *VM) {
+		vm.stack = append(vm.stack, vm.val)
+		vm.next = compileList(cdr(exp), locals, frees, next)
+	})
 }
