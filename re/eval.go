@@ -1,6 +1,7 @@
 package re
 
 import (
+	"reflect"
 	"bytes"
 	"fmt"
 	"io"
@@ -958,8 +959,17 @@ func trampoline(vm *VM, code func(*VM)) {
 	}
 }
 
+func exit(vm *VM) {
+	vm.ret(vm.val)
+}
+
 func eval(vm *VM, exp Obj) Obj {
-	code := newCompile(exp, Nil, nil, func(vm *VM){})
+	code := newCompile(exp, Nil, nil, exit)
+	vm.callStack = append(vm.callStack, returnAddr{
+		pc: nil,
+		base: vm.base,
+		pos: len(vm.stack),
+	})
 	trampoline(vm, code)
 	return vm.val
 }
@@ -1225,7 +1235,6 @@ func newCompile(exp Obj, locals Obj, frees []Obj, next func(*VM)) func(vm *VM) {
 		idx := assq(exp, locals)
 		if idx >= 0 {
 			return func(vm *VM) {
-				// fmt.Println("localref", exp, idx, vm.base)
 				vm.val = vm.stack[vm.base + idx + 1]
 				vm.next = next
 			}
@@ -1276,9 +1285,7 @@ func newCompile(exp Obj, locals Obj, frees []Obj, next func(*VM)) func(vm *VM) {
 		args := cadr(exp)
 		body := caddr(exp)
 		frees1 := findFrees(exp, Nil, nil)
-		code := newCompile(body, args, frees1, func(vm *VM) {
-			vm.ret(vm.val)
-		})
+		code := newCompile(body, args, frees1, exit)
 		return compileList(sliceToList(frees1), locals, frees, func(vm *VM) {
 			vm.val = &Closure{
 				closed: append([]Obj{}, vm.stack[len(vm.stack)-len(frees1):]...),
@@ -1290,19 +1297,32 @@ func newCompile(exp Obj, locals Obj, frees []Obj, next func(*VM)) func(vm *VM) {
 
 	// compile call
 	nargs := listLength(exp)
+	tail := reflect.ValueOf(next).Pointer() == reflect.ValueOf(exit).Pointer()
 	return compileList(exp, locals, frees, func(vm *VM) {
-		// save the stack
-		newBase := len(vm.stack)-nargs
-		vm.callStack = append(vm.callStack, returnAddr{
-			pc: next,
-			base: vm.base,
-			pos: newBase,
-		})
+		if !tail {
+			// normal call
+			// save the stack
+			newBase := len(vm.stack)-nargs
+			vm.callStack = append(vm.callStack, returnAddr{
+				pc: next,
+				base: vm.base,
+				pos: newBase,
+			})
 
-		// make the call
-		fn := vm.stack[newBase].(*Closure)
-		vm.base = newBase
-		vm.next = fn.code
+			// make the call
+			fn := vm.stack[newBase].(*Closure)
+			vm.base = newBase
+			vm.next = fn.code
+		} else {
+			// tail call
+			// prepare arguments
+			copy(vm.stack[vm.base:], vm.stack[len(vm.stack)-nargs:])
+			vm.stack = vm.stack[:vm.base+nargs]
+
+			// make the call
+			fn := vm.stack[vm.base].(*Closure)
+			vm.next = fn.code
+		}
 	})
 }
 
