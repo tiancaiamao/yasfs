@@ -106,11 +106,11 @@ var basicCases = []testCase{
 		output: "3",
 	},
 
-	// testCase{
-	// 	name:   "closure value",
-	// 	input:  "((((lambda x (lambda y (lambda z (+ x z)))) 1) 2) 3)",
-	// 	output: "4",
-	// },
+	testCase{
+		name:   "closure value",
+		input:  "((((lambda (x) (lambda (y) (lambda (z) (+ x z)))) 1) 2) 3)",
+		output: "4",
+	},
 
 	testCase{
 		name:   "basic func call",
@@ -142,11 +142,11 @@ var basicCases = []testCase{
 	// 	output: "3",
 	// },
 
-	// testCase{
-	// 	name:   "basic lambda",
-	// 	input:  `(((lambda (x y) (lambda (z) y)) 1 2) 3)`,
-	// 	output: "2",
-	// },
+	testCase{
+		name:   "basic lambda",
+		input:  `(((lambda (x y) (lambda (z) y)) 1 2) 3)`,
+		output: "2",
+	},
 
 	testCase{
 		name:   "basic do",
@@ -246,20 +246,47 @@ func evalString(ctx *VM, exp string) Obj {
 // 	fmt.Println(res.String())
 // }
 
+// func TestFindFrees(t *testing.T) {
+// 	// r := NewSexpReader(strings.NewReader(`(lambda (x) x)`))
+// 	// r := NewSexpReader(strings.NewReader(`(lambda (z) (+ x z))`))
+// 	r := NewSexpReader(strings.NewReader(`((((lambda (x) (lambda (y) (lambda (z) (+ x z)))) 1) 2) 3)`))
+// 	sexp, err := r.Read()
+// 	if err != nil && err != io.EOF {
+// 		panic(err)
+// 	}
+// 	frees := findFrees(sexp, Nil, Nil, nil)
+// 	for _, v := range frees {
+// 		fmt.Println("frees:", v)
+// 	}
+// }
+
+func TestClosureConvert(t *testing.T) {
+	// r := NewSexpReader(strings.NewReader(`(lambda (x) x)`))
+	// r := NewSexpReader(strings.NewReader(`(lambda (z) (+ x z))`))
+	r := NewSexpReader(strings.NewReader(`((((lambda (x) (lambda (y) (lambda (z) (+ x y)))) 1) 2) 3)`))
+	sexp, err := r.Read()
+	if err != nil && err != io.EOF {
+		panic(err)
+	}
+	exp1, frees := closureConvert(sexp, Nil, Nil, nil)
+	fmt.Println("result:", exp1, frees)
+}
+
 func TestXXX(t *testing.T) {
-	// r := NewSexpReader(strings.NewReader(`(+ (* 4 7) 3)`))
+	// r := NewSexpReader(strings.NewReader(`((((lambda (x) (lambda (y) (lambda (z) (+ x z)))) 1) 2) 3)`))
+	// r := NewSexpReader(strings.NewReader(`(((lambda (x) (lambda () (+ x 1))) 5))`))
 	// r := NewSexpReader(strings.NewReader(`(do (set 'f (lambda (x) x)) (f 44))`))
-	r := NewSexpReader(strings.NewReader(`(do 
- (set 'f (lambda (a b c) a))
- (do 
-  (set 'g (lambda (n) (+ n 1)))
-  (f 1 (g 5) 4)))`))
+ // 	r := NewSexpReader(strings.NewReader(`(do 
+ // (set 'f (lambda (a b c) a))
+ // (do 
+ //  (set 'g (lambda (n) (+ n 1)))
+ //  (f 1 (g 5) 4)))`))
 	// r := NewSexpReader(strings.NewReader("(load \"../cmd/cora/init.cora\")"))
-	// r := NewSexpReader(strings.NewReader(`(do (set (quote sum) (lambda (r i)
-	//   (if (= i 0)
-	//       r
-	//       (sum (+ r 1) (- i 1)))))
-	// (sum 0 5000000))`))
+	r := NewSexpReader(strings.NewReader(`(do (set (quote sum) (lambda (r i)
+	  (if (= i 0)
+	      r
+	      (sum (+ r 1) (- i 1)))))
+	(sum 0 5000000))`))
 	sexp, err := r.Read()
 	if err != nil && err != io.EOF {
 		panic(err)
@@ -277,16 +304,4 @@ func TestXXX(t *testing.T) {
 
 	// var cg CodeGen
 	// cg.GenC(code)
-}
-
-func TestFindFrees(t *testing.T) {
-	r := NewSexpReader(strings.NewReader(`(lambda (x) x)`))
-	sexp, err := r.Read()
-	if err != nil && err != io.EOF {
-		panic(err)
-	}
-	frees := findFrees(sexp, Nil, nil)
-	for _, v := range frees {
-		fmt.Println("frees:", v)
-	}
 }

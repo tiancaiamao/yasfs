@@ -964,7 +964,8 @@ func exit(vm *VM) {
 }
 
 func eval(vm *VM, exp Obj) Obj {
-	code := newCompile(exp, Nil, nil, exit)
+	exp1, _ := closureConvert(exp, Nil, Nil, nil)
+	code := newCompile(exp1, Nil, Nil, exit)
 	vm.callStack = append(vm.callStack, returnAddr{
 		pc: nil,
 		base: vm.base,
@@ -1175,42 +1176,109 @@ func instrForThrow(vm *VM) {
 	// vm.pc = handler.Code
 }
 
-
-func findFrees(exp Obj, env Obj, ret []Obj) []Obj {
+func closureConvert(exp Obj, locals Obj, env Obj, frees []Obj) (Obj, []Obj) {
 	switch exp.(type) {
 	case nilObj, booleanObj, Integer, String, Float64:
-		return ret
+		return exp, frees
 	case *Symbol:
-		for env != Nil {
-			x := car(env)
-			for x != Nil {
-				if car(x) == exp {
-					return ret
+		if assq(exp, locals) < 0 {
+			for env != Nil {
+				x := car(env)
+				for x != Nil {
+					if car(x) == exp {
+						frees = append(frees, exp)
+						return exp, frees
+					}
+					x = cdr(x)
 				}
-				x = cdr(x)
+				env = cdr(env)
 			}
-			env = cdr(env)
 		}
-		ret = append(ret, exp)
-		return ret
+		return exp, frees
 	}
 	raw := exp.(*Cons)
 	switch raw.car {
 	case symQuote:
 	case symIf:
-		ret = findFrees(cadr(exp), env, ret)
-		ret = findFrees(caddr(exp), env, ret)
-		ret = findFrees(caddr(cdr(exp)), env, ret)
+		var test, succ, fail Obj
+		test, frees = closureConvert(cadr(exp), locals, env, frees)
+		succ, frees = closureConvert(caddr(exp), locals, env, frees)
+		fail, frees = closureConvert(caddr(cdr(exp)), locals, env, frees)
+		return cons(symIf, cons(test, cons(succ, cons(fail, Nil)))), frees
 	case symDo:
-		ret = findFrees(cadr(exp), env, ret)
-		ret = findFrees(caddr(exp), env, ret)
+		var x, y Obj
+		x, frees = closureConvert(cadr(exp), locals, env, frees)
+		y, frees = closureConvert(caddr(exp), locals, env, frees)
+		return cons(symDo, cons(x, cons(y, Nil))), frees 
 	case symLambda:
 		args := cadr(exp)
 		body := caddr(exp)
-		ret = findFrees(body, cons(args, env), ret)
+		body1, frees1 := closureConvert(body, args, cons(locals, env), nil)
+		for _, free := range frees1 {
+			if assq(free, locals) < 0 {
+				frees = append(frees, free)
+			}
+		}
+		return cons(symLambda, cons(args, cons(sliceToList(frees1), cons(body1, Nil)))), frees
 	}
-	return ret
+	ret := Nil
+	for ; exp != Nil; exp = cdr(exp) {
+		var tmp Obj
+		tmp, frees = closureConvert(car(exp), locals, env, frees)
+		ret = cons(tmp, ret)
+	}
+	return reverse(ret), frees
 }
+
+
+// findFrees finds the free variable for the closure.
+// If a symbol can't be find in the local, and can be find in its env, then it's a free variable.
+// func findFrees(exp Obj, locals Obj, env Obj, ret []Obj) []Obj {
+// 	switch exp.(type) {
+// 	case nilObj, booleanObj, Integer, String, Float64:
+// 		return ret
+// 	case *Symbol:
+// 		if assq(exp, locals) < 0 {
+// 			for env != Nil {
+// 				x := car(env)
+// 				for x != Nil {
+// 					if car(x) == exp {
+// 						ret = append(ret, exp)
+// 						return ret
+// 					}
+// 					x = cdr(x)
+// 				}
+// 				env = cdr(env)
+// 			}
+// 		}
+// 		return ret
+// 	}
+// 	raw := exp.(*Cons)
+// 	switch raw.car {
+// 	case symQuote:
+// 	case symIf:
+// 		ret = findFrees(cadr(exp), locals, env, ret)
+// 		ret = findFrees(caddr(exp), locals, env, ret)
+// 		ret = findFrees(caddr(cdr(exp)), locals, env, ret)
+// 	case symDo:
+// 		ret = findFrees(cadr(exp), locals, env, ret)
+// 		ret = findFrees(caddr(exp), locals, env, ret)
+// 	case symLambda:
+// 		args := cadr(exp)
+// 		body := caddr(exp)
+// 		frees := findFrees(body, args, cons(locals, env), nil)
+// 		for _, free := range frees {
+// 			if assq(free, locals) < 0 {
+// 				ret = append(ret, free)
+// 			}
+// 		}
+// 	default:
+// 		for ; exp != Nil; exp = cdr(exp) {
+// 			ret = findFrees(car(exp), locals, env, ret)
+// 		}
+// 	}
+// 	return ret
+// }
 
 func assq(v, list Obj) int {
 	idx := 0
@@ -1224,12 +1292,13 @@ func assq(v, list Obj) int {
 	return -1
 }
 
-func newCompile(exp Obj, locals Obj, frees []Obj, next func(*VM)) func(vm *VM) {
+func newCompile(exp Obj, locals Obj, frees Obj, next func(*VM)) func(vm *VM) {
 	switch raw := exp.(type) {
 	case nilObj, booleanObj, Integer, String, Float64:
 		return func(vm *VM) {
 			vm.val = exp
 			vm.next = next
+			// fmt.Println("const val =", exp)
 		}
 	case *Symbol:
 		idx := assq(exp, locals)
@@ -1239,12 +1308,12 @@ func newCompile(exp Obj, locals Obj, frees []Obj, next func(*VM)) func(vm *VM) {
 				vm.next = next
 			}
 		}
-		for i, v := range frees {
-			if v == exp {
-				return func(vm *VM) {
-					closure := vm.stack[vm.base].(*Closure)
-					vm.val = closure.closed[i]
-				}
+		idx = assq(exp, frees)
+		if idx >= 0 {
+			return func(vm *VM) {
+				closure := vm.stack[vm.base].(*Closure)
+				vm.val = closure.closed[idx]
+				vm.next = next
 			}
 		}
 		return func(vm *VM) {
@@ -1277,28 +1346,34 @@ func newCompile(exp Obj, locals Obj, frees []Obj, next func(*VM)) func(vm *VM) {
 			}
 		})
 	case symDo:
-		y := newCompile(caddr(raw), locals, frees, next)
+		y := newCompile(caddr(raw), locals,  frees, next)
 		return newCompile(cadr(raw), locals, frees, func(vm *VM) {
 			y(vm)
 		})
 	case symLambda:
 		args := cadr(exp)
-		body := caddr(exp)
-		frees1 := findFrees(exp, Nil, nil)
+		frees1 := caddr(exp)
+		body := caddr(cdr(exp))
+		// frees1 := findFrees(exp, locals, nil)
+		// fmt.Println("compile lambda:", exp)
 		code := newCompile(body, args, frees1, exit)
-		return compileList(sliceToList(frees1), locals, frees, func(vm *VM) {
+		// fmt.Println("compile frees for lambda, free==", frees1, "frees=", frees, "locals=", locals)
+		return compileList(frees1, locals, frees, func(vm *VM) {
 			vm.val = &Closure{
-				closed: append([]Obj{}, vm.stack[len(vm.stack)-len(frees1):]...),
+				closed: append([]Obj{}, vm.stack[len(vm.stack)-listLength(frees1):]...),
 				code: code,
 			}
+			vm.stack = vm.stack[:len(vm.stack)-listLength(frees1)]
 			vm.next = next
 		})
 	}
 
 	// compile call
+	// fmt.Println("compile call ==", exp)
 	nargs := listLength(exp)
 	tail := reflect.ValueOf(next).Pointer() == reflect.ValueOf(exit).Pointer()
 	return compileList(exp, locals, frees, func(vm *VM) {
+		// fmt.Println("make a call", exp)
 		if !tail {
 			// normal call
 			// save the stack
@@ -1326,12 +1401,13 @@ func newCompile(exp Obj, locals Obj, frees []Obj, next func(*VM)) func(vm *VM) {
 	})
 }
 
-func compileList(exp Obj, locals Obj, frees []Obj, next func(*VM)) func(*VM) {
+func compileList(exp Obj, locals Obj, frees Obj, next func(*VM)) func(*VM) {
 	if exp == Nil {
 		return next
 	}
+	remain := compileList(cdr(exp), locals, frees, next)
 	return newCompile(car(exp), locals, frees, func(vm *VM) {
 		vm.stack = append(vm.stack, vm.val)
-		vm.next = compileList(cdr(exp), locals, frees, next)
+		vm.next = remain
 	})
 }
