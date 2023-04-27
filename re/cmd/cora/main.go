@@ -18,8 +18,10 @@ func main() {
 		if err != nil && err != io.EOF {
 			panic(err)
 		}
+		// fmt.Println("read=", sexp)
 
 		sexp = vm.MacroExpand(sexp)
+		// fmt.Println("after macroexpand=", sexp)
 
 		res := vm.Eval(sexp)
 

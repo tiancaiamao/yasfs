@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"reflect"
 	"strconv"
 )
@@ -120,12 +121,17 @@ func init() {
 	MakeSymbol("car").val = primCar
 	MakeSymbol("cdr").val = primCdr
 	MakeSymbol("cons").val = primCons
+	MakeSymbol("cons?").val = primIsCons
 	MakeSymbol("+").val = primAdd
 	MakeSymbol("-").val = primSub
 	MakeSymbol("*").val = primMul
 	MakeSymbol("/").val = primDiv
 	MakeSymbol("=").val = primEQ
 	MakeSymbol("set").val = primSet
+	MakeSymbol("load").val = primLoad
+	MakeSymbol("gensym").val = primGenSym
+	MakeSymbol("symbol?").val = primIsSymbol
+	MakeSymbol("not").val = primNot
 }
 
 func MakeSymbol(str string) *Symbol {
@@ -325,14 +331,46 @@ var primSet = &Closure{
 	Name:     "Set",
 }
 
-var primValue = &Closure{
-	code: func(vm *VM) {
-		key := vm.pop()
-		val := key.(*Symbol).val
-		vm.ret(val)
+var primLoad = &Closure{
+	code: func(e *VM) {
+		file := e.pop()
+		tmp, ok := file.(String)
+		if !ok {
+			panic("arg1 must be string")
+			return
+		}
+		path := string(tmp)
+		if _, err := os.Stat(path); err != nil {
+			panic(err.Error())
+			return
+		}
+
+		f, err := os.Open(path)
+		if err != nil {
+			panic(err.Error())
+			return
+		}
+		defer f.Close()
+
+		r := NewSexpReader(f)
+		for {
+			exp, err := r.Read()
+			if err != nil {
+				if err != io.EOF {
+					panic(err)
+					return
+				}
+				break
+			}
+
+			exp = e.MacroExpand(exp)
+
+			e.Eval(exp)
+		}
+		e.ret(MakeSymbol("loaded"))
 	},
 	Required: 1,
-	Name:     "Value",
+	Name:     "load",
 }
 
 var primCar = &Closure{
@@ -360,7 +398,63 @@ var primCons = &Closure{
 		vm.ret(cons(y, x))
 	},
 	Required: 2,
-	Name:     "cdr",
+	Name:     "cons",
+}
+
+var primIsCons = &Closure{
+	code: func(vm *VM) {
+		x := vm.pop()
+		if _, ok := x.(*Cons); ok {
+			vm.ret(True)
+		} else {
+			vm.ret(False)
+		}
+	},
+	Required: 1,
+	Name:     "cons?",
+}
+
+var primIsSymbol = &Closure{
+	code: func(vm *VM) {
+		x := vm.pop()
+		if _, ok := x.(*Symbol); ok {
+			vm.ret(True)
+		} else {
+			vm.ret(False)
+		}
+	},
+	Required: 1,
+	Name:     "symbol?",
+}
+
+var genIdx int
+
+var primGenSym = &Closure{
+	code: func(vm *VM) {
+		obj := vm.pop()
+		sym := obj.(*Symbol)
+		res := MakeSymbol(fmt.Sprintf("#%s%d", sym.str, genIdx))
+		genIdx++
+		vm.ret(res)
+	},
+	Required: 1,
+	Name:     "gensym",
+}
+
+var primNot = &Closure{
+	code: func(vm *VM) {
+		obj := vm.pop()
+		switch obj {
+		case True:
+			vm.ret(False)
+		case False:
+			vm.ret(True)
+		default:
+			panic("wrong argument for not")
+		}
+	},
+	Required: 1,
+	Name:     "not",
 }
 
 var primAdd = &Closure{
@@ -460,6 +554,7 @@ func closureConvert(exp Obj, locals Obj, env Obj, frees []Obj) (Obj, []Obj) {
 	raw := exp.(*Cons)
 	switch raw.car {
 	case symQuote:
+		return exp, frees
 	case symIf:
 		var test, succ, fail Obj
 		test, frees = closureConvert(cadr(exp), locals, env, frees)
