@@ -1,17 +1,17 @@
 package main
 
 import (
-	"os"
 	"fmt"
 	"io"
-	
+	"os"
+
 	"yasfs/re"
 )
 
 func main() {
 	vm := re.New()
 	r := re.NewSexpReader(os.Stdin)
-	for i:=0; ; i++ {
+	for i := 0; ; i++ {
 		fmt.Printf("%d #> ", i)
 
 		sexp, err := r.Read()

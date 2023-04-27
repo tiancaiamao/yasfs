@@ -14,12 +14,11 @@ type testCase struct {
 }
 
 var basicCases = []testCase{
-	// testCase{
-	// 	name:   "curry as arg",
-	// 	input:  `((lambda (f) (f 42)) (+ 1))`,
-	// 	output: "43",
-	// },
-	
+	testCase{
+		name:   "curry as arg",
+		input:  `((lambda (f) (f 42)) (+ 1))`,
+		output: "43",
+	},
 
 	// testCase{
 	// 	name: "let-variable-shadow",
@@ -38,17 +37,17 @@ var basicCases = []testCase{
 	// 		output: "true",
 	// 	},
 
-	// testCase{
-	// 	name:   "curry",
-	// 	input:  `(do (set (quote f) (lambda (x y z) y)) ((f 1 2) 3))`,
-	// 	output: "2",
-	// },
+	testCase{
+		name:   "curry",
+		input:  `(do (set (quote f) (lambda (x y z) y)) ((f 1 2) 3))`,
+		output: "2",
+	},
 
-	// testCase{
-	// 	name:   "curry-partial",
-	// 	input:  `((lambda x (lambda y (lambda z (+ x z)))) 1 2 3)`,
-	// 	output: "4",
-	// },
+	testCase{
+		name:   "curry-partial",
+		input:  `((lambda (x) (lambda (y) (lambda (z) (+ x z)))) 1 2 3)`,
+		output: "4",
+	},
 
 	// testCase{
 	// 	name:   "trap-let",
@@ -56,15 +55,15 @@ var basicCases = []testCase{
 	// 	output: "42",
 	// },
 
-	// testCase{
-	// 	name: "curry1",
-	// 	input: `(do (set (quote f) (lambda (x)
-	// 		 (do (set (quote ignore) (lambda (z w)
-	// 		   (lambda (y)
-	// 		      z))) (ignore))))
-	// 		(((f 1) 2 3) 4))`,
-	// 	output: "2",
-	// },
+	testCase{
+		name: "curry1",
+		input: `(do (set (quote f) (lambda (x)
+			 (do (set (quote ignore) (lambda (z w)
+			   (lambda (y)
+			      z))) (ignore))))
+			(((f 1) 2 3) 4))`,
+		output: "2",
+	},
 
 	testCase{
 		name: "fib10",
@@ -94,11 +93,11 @@ var basicCases = []testCase{
 		output: "7",
 	},
 
-	// testCase{
-	// 	name:   "partial primitive",
-	// 	input:  `(+ (+ (+ 1 2) 3) 4)`,
-	// 	output: "10",
-	// },
+	testCase{
+		name:   "partial primitive",
+		input:  `(+ (+ (+ 1 2) 3) 4)`,
+		output: "10",
+	},
 
 	testCase{
 		name:   "do in tail call",
@@ -136,11 +135,11 @@ var basicCases = []testCase{
 		output: "1",
 	},
 
-	// testCase{
-	// 	name:   "curry lambda",
-	// 	input:  `((lambda x (lambda y (lambda z z))) 1 2 3)`,
-	// 	output: "3",
-	// },
+	testCase{
+		name:   "curry lambda",
+		input:  `((lambda (x) (lambda (y) (lambda (z) z))) 1 2 3)`,
+		output: "3",
+	},
 
 	testCase{
 		name:   "basic lambda",
@@ -166,17 +165,17 @@ var basicCases = []testCase{
 		output: "42",
 	},
 
-	// testCase{
-	// 	name:   "partial primitive1",
-	// 	input:  `((+ 1) 2)`,
-	// 	output: "3",
-	// },
+	testCase{
+		name:   "partial primitive1",
+		input:  `((+ 1) 2)`,
+		output: "3",
+	},
 
-	// testCase{
-	// 	name:   "partial primitive2",
-	// 	input:  `(((+) 1) 2)`,
-	// 	output: "3",
-	// },
+	testCase{
+		name:   "partial primitive2",
+		input:  `(((+) 1) 2)`,
+		output: "3",
+	},
 }
 
 func TestBasic(t *testing.T) {
@@ -201,15 +200,15 @@ func TestBasic(t *testing.T) {
 	}
 }
 
-// func TestIssue25(t *testing.T) {
-// 	ctx := New()
-// 	evalString(ctx, "(set (quote return) (lambda (x) (lambda (k) (k x))))")
-// 	evalString(ctx, "(set (quote add1) (lambda (n) (return (+ n 1))))")
-// 	res := evalString(ctx, "(add1 4 (lambda (x) x))")
-// 	if res != Integer(5) {
-// 		t.Fail()
-// 	}
-// }
+func TestIssue25(t *testing.T) {
+	ctx := New()
+	evalString(ctx, "(set (quote return) (lambda (x) (lambda (k) (k x))))")
+	evalString(ctx, "(set (quote add1) (lambda (n) (return (+ n 1))))")
+	res := evalString(ctx, "(add1 4 (lambda (x) x))")
+	if res != Integer(5) {
+		t.Fail()
+	}
+}
 
 func evalString(ctx *VM, exp string) Obj {
 	r := NewSexpReader(strings.NewReader(exp))
@@ -246,19 +245,6 @@ func evalString(ctx *VM, exp string) Obj {
 // 	fmt.Println(res.String())
 // }
 
-// func TestFindFrees(t *testing.T) {
-// 	// r := NewSexpReader(strings.NewReader(`(lambda (x) x)`))
-// 	// r := NewSexpReader(strings.NewReader(`(lambda (z) (+ x z))`))
-// 	r := NewSexpReader(strings.NewReader(`((((lambda (x) (lambda (y) (lambda (z) (+ x z)))) 1) 2) 3)`))
-// 	sexp, err := r.Read()
-// 	if err != nil && err != io.EOF {
-// 		panic(err)
-// 	}
-// 	frees := findFrees(sexp, Nil, Nil, nil)
-// 	for _, v := range frees {
-// 		fmt.Println("frees:", v)
-// 	}
-// }
 
 func TestClosureConvert(t *testing.T) {
 	// r := NewSexpReader(strings.NewReader(`(lambda (x) x)`))
@@ -273,20 +259,22 @@ func TestClosureConvert(t *testing.T) {
 }
 
 func TestXXX(t *testing.T) {
+	r := NewSexpReader(strings.NewReader(`((+ 1) 2)`))
+	// r := NewSexpReader(strings.NewReader(`(((lambda (x y) x) 4) 5)`))
 	// r := NewSexpReader(strings.NewReader(`((((lambda (x) (lambda (y) (lambda (z) (+ x z)))) 1) 2) 3)`))
 	// r := NewSexpReader(strings.NewReader(`(((lambda (x) (lambda () (+ x 1))) 5))`))
 	// r := NewSexpReader(strings.NewReader(`(do (set 'f (lambda (x) x)) (f 44))`))
- // 	r := NewSexpReader(strings.NewReader(`(do 
- // (set 'f (lambda (a b c) a))
- // (do 
- //  (set 'g (lambda (n) (+ n 1)))
- //  (f 1 (g 5) 4)))`))
+	// 	r := NewSexpReader(strings.NewReader(`(do
+	// (set 'f (lambda (a b c) a))
+	// (do
+	//  (set 'g (lambda (n) (+ n 1)))
+	//  (f 1 (g 5) 4)))`))
 	// r := NewSexpReader(strings.NewReader("(load \"../cmd/cora/init.cora\")"))
-	r := NewSexpReader(strings.NewReader(`(do (set (quote sum) (lambda (r i)
-	  (if (= i 0)
-	      r
-	      (sum (+ r 1) (- i 1)))))
-	(sum 0 5000000))`))
+	// r := NewSexpReader(strings.NewReader(`(do (set (quote sum) (lambda (r i)
+	//   (if (= i 0)
+	//       r
+	//       (sum (+ r 1) (- i 1)))))
+	// (sum 0 5000000))`))
 	sexp, err := r.Read()
 	if err != nil && err != io.EOF {
 		panic(err)
@@ -299,7 +287,7 @@ func TestXXX(t *testing.T) {
 	// loadFile(vm, "../cmd/cora/init.cora")
 
 	var vm VM
-	res :=  vm.Eval(sexp)
+	res := vm.Eval(sexp)
 	fmt.Printf("%#v\n", res)
 
 	// var cg CodeGen

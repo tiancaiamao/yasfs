@@ -1,13 +1,12 @@
 package re
 
 import (
-	"reflect"
 	"bytes"
 	"fmt"
 	"io"
 	"math"
+	"reflect"
 	"strconv"
-
 	// "time"
 )
 
@@ -106,6 +105,7 @@ var symbolMap = make(map[string]*Symbol)
 var symQuote, symIf, symDo, symLambda Obj
 var symMacroExpand *Symbol
 var symCond, symAnd, symOr, symLet, symType, symFreeze, symTrapError, symSimpleError Obj
+
 // var uptime time.Time
 
 func init() {
@@ -176,20 +176,20 @@ func (c *Cons) String() string {
 }
 
 func printCons(to io.Writer, o Obj, start bool) {
-	if (start) {
-		fmt.Fprintf(to, "(");
+	if start {
+		fmt.Fprintf(to, "(")
 	} else {
-		fmt.Fprintf(to, " ");
+		fmt.Fprintf(to, " ")
 	}
 	fmt.Fprintf(to, "%s", car(o).String())
 
-	tl := cdr(o);
-	if (tl == Nil) {
+	tl := cdr(o)
+	if tl == Nil {
 		fmt.Fprintf(to, ")")
 	} else if _, ok := tl.(*Cons); ok {
-		printCons(to, tl, false);
+		printCons(to, tl, false)
 	} else {
-		fmt.Fprintf(to, " . ");
+		fmt.Fprintf(to, " . ")
 		fmt.Fprintf(to, "%s", tl)
 		fmt.Fprintf(to, ")")
 	}
@@ -203,10 +203,10 @@ func printCons(to io.Writer, o Obj, start bool) {
 // }
 
 type Closure struct {
-	closed []Obj
-	code func(vm *VM)
+	closed   []Obj
+	code     func(vm *VM)
 	Required int
-	Name string
+	Name     string
 }
 
 func (c *Closure) String() string {
@@ -219,6 +219,7 @@ func (c *Closure) String() string {
 
 type Curry struct {
 	Required int
+	code     func(vm *VM)
 	Closed   []Obj
 	Prim     *Primitive
 }
@@ -273,16 +274,16 @@ func (c *Primitive) String() string {
 // =======================================
 
 type returnAddr struct {
-	pc func(*VM)
+	pc   func(*VM)
 	base int
-	pos int
+	pos  int
 }
 
 type VM struct {
-	next  func(*VM)
-	stack []Obj
-	base int
-	val   Obj
+	next      func(*VM)
+	stack     []Obj
+	base      int
+	val       Obj
 	callStack []returnAddr
 }
 
@@ -329,8 +330,8 @@ func (vm *VM) push(v Obj) {
 }
 
 func (vm *VM) pop() Obj {
-	ret := vm.stack[len(vm.stack) - 1]
-	vm.stack = vm.stack[:len(vm.stack) - 1]
+	ret := vm.stack[len(vm.stack)-1]
+	vm.stack = vm.stack[:len(vm.stack)-1]
 	return ret
 }
 
@@ -939,7 +940,7 @@ func listLength(l Obj) int {
 
 func sliceToList(s []Obj) Obj {
 	ret := Nil
-	for i:=len(s)-1; i>=0; i-- {
+	for i := len(s) - 1; i >= 0; i-- {
 		x := s[i]
 		ret = cons(x, ret)
 	}
@@ -967,9 +968,9 @@ func eval(vm *VM, exp Obj) Obj {
 	exp1, _ := closureConvert(exp, Nil, Nil, nil)
 	code := newCompile(exp1, Nil, Nil, exit)
 	vm.callStack = append(vm.callStack, returnAddr{
-		pc: nil,
+		pc:   nil,
 		base: vm.base,
-		pos: len(vm.stack),
+		pos:  len(vm.stack),
 	})
 	trampoline(vm, code)
 	return vm.val
@@ -995,7 +996,6 @@ var primValue = &Closure{
 	Required: 1,
 	Name:     "Value",
 }
-
 
 var primCar = &Closure{
 	code: func(vm *VM) {
@@ -1209,7 +1209,7 @@ func closureConvert(exp Obj, locals Obj, env Obj, frees []Obj) (Obj, []Obj) {
 		var x, y Obj
 		x, frees = closureConvert(cadr(exp), locals, env, frees)
 		y, frees = closureConvert(caddr(exp), locals, env, frees)
-		return cons(symDo, cons(x, cons(y, Nil))), frees 
+		return cons(symDo, cons(x, cons(y, Nil))), frees
 	case symLambda:
 		args := cadr(exp)
 		body := caddr(exp)
@@ -1230,56 +1230,6 @@ func closureConvert(exp Obj, locals Obj, env Obj, frees []Obj) (Obj, []Obj) {
 	return reverse(ret), frees
 }
 
-
-// findFrees finds the free variable for the closure.
-// If a symbol can't be find in the local, and can be find in its env, then it's a free variable.
-// func findFrees(exp Obj, locals Obj, env Obj, ret []Obj) []Obj {
-// 	switch exp.(type) {
-// 	case nilObj, booleanObj, Integer, String, Float64:
-// 		return ret
-// 	case *Symbol:
-// 		if assq(exp, locals) < 0 {
-// 			for env != Nil {
-// 				x := car(env)
-// 				for x != Nil {
-// 					if car(x) == exp {
-// 						ret = append(ret, exp)
-// 						return ret
-// 					}
-// 					x = cdr(x)
-// 				}
-// 				env = cdr(env)
-// 			}
-// 		}
-// 		return ret
-// 	}
-// 	raw := exp.(*Cons)
-// 	switch raw.car {
-// 	case symQuote:
-// 	case symIf:
-// 		ret = findFrees(cadr(exp), locals, env, ret)
-// 		ret = findFrees(caddr(exp), locals, env, ret)
-// 		ret = findFrees(caddr(cdr(exp)), locals, env, ret)
-// 	case symDo:
-// 		ret = findFrees(cadr(exp), locals, env, ret)
-// 		ret = findFrees(caddr(exp), locals, env, ret)
-// 	case symLambda:
-// 		args := cadr(exp)
-// 		body := caddr(exp)
-// 		frees := findFrees(body, args, cons(locals, env), nil)
-// 		for _, free := range frees {
-// 			if assq(free, locals) < 0 {
-// 				ret = append(ret, free)
-// 			}
-// 		}
-// 	default:
-// 		for ; exp != Nil; exp = cdr(exp) {
-// 			ret = findFrees(car(exp), locals, env, ret)
-// 		}
-// 	}
-// 	return ret
-// }
-
 func assq(v, list Obj) int {
 	idx := 0
 	for list != Nil {
@@ -1298,13 +1248,12 @@ func newCompile(exp Obj, locals Obj, frees Obj, next func(*VM)) func(vm *VM) {
 		return func(vm *VM) {
 			vm.val = exp
 			vm.next = next
-			// fmt.Println("const val =", exp)
 		}
 	case *Symbol:
 		idx := assq(exp, locals)
 		if idx >= 0 {
 			return func(vm *VM) {
-				vm.val = vm.stack[vm.base + idx + 1]
+				vm.val = vm.stack[vm.base+idx+1]
 				vm.next = next
 			}
 		}
@@ -1336,7 +1285,7 @@ func newCompile(exp Obj, locals Obj, frees Obj, next func(*VM)) func(vm *VM) {
 		thenCont := newCompile(cadr(raw.cdr), locals, frees, next)
 		elseCont := newCompile(caddr(raw.cdr), locals, frees, next)
 		return newCompile(car(raw.cdr), locals, frees, func(vm *VM) {
-			switch (vm.val) {
+			switch vm.val {
 			case True:
 				thenCont(vm)
 			case False:
@@ -1346,7 +1295,7 @@ func newCompile(exp Obj, locals Obj, frees Obj, next func(*VM)) func(vm *VM) {
 			}
 		})
 	case symDo:
-		y := newCompile(caddr(raw), locals,  frees, next)
+		y := newCompile(caddr(raw), locals, frees, next)
 		return newCompile(cadr(raw), locals, frees, func(vm *VM) {
 			y(vm)
 		})
@@ -1354,14 +1303,12 @@ func newCompile(exp Obj, locals Obj, frees Obj, next func(*VM)) func(vm *VM) {
 		args := cadr(exp)
 		frees1 := caddr(exp)
 		body := caddr(cdr(exp))
-		// frees1 := findFrees(exp, locals, nil)
-		// fmt.Println("compile lambda:", exp)
 		code := newCompile(body, args, frees1, exit)
-		// fmt.Println("compile frees for lambda, free==", frees1, "frees=", frees, "locals=", locals)
 		return compileList(frees1, locals, frees, func(vm *VM) {
 			vm.val = &Closure{
-				closed: append([]Obj{}, vm.stack[len(vm.stack)-listLength(frees1):]...),
-				code: code,
+				closed:   append([]Obj{}, vm.stack[len(vm.stack)-listLength(frees1):]...),
+				code:     code,
+				Required: listLength(args),
 			}
 			vm.stack = vm.stack[:len(vm.stack)-listLength(frees1)]
 			vm.next = next
@@ -1369,36 +1316,70 @@ func newCompile(exp Obj, locals Obj, frees Obj, next func(*VM)) func(vm *VM) {
 	}
 
 	// compile call
-	// fmt.Println("compile call ==", exp)
 	nargs := listLength(exp)
 	tail := reflect.ValueOf(next).Pointer() == reflect.ValueOf(exit).Pointer()
-	return compileList(exp, locals, frees, func(vm *VM) {
-		// fmt.Println("make a call", exp)
-		if !tail {
-			// normal call
-			// save the stack
-			newBase := len(vm.stack)-nargs
-			vm.callStack = append(vm.callStack, returnAddr{
-				pc: next,
-				base: vm.base,
-				pos: newBase,
-			})
-
-			// make the call
-			fn := vm.stack[newBase].(*Closure)
-			vm.base = newBase
-			vm.next = fn.code
-		} else {
-			// tail call
+	var cont func(vm *VM)
+	if tail {
+		cont = func(vm *VM) {
 			// prepare arguments
 			copy(vm.stack[vm.base:], vm.stack[len(vm.stack)-nargs:])
 			vm.stack = vm.stack[:vm.base+nargs]
-
 			// make the call
-			fn := vm.stack[vm.base].(*Closure)
-			vm.next = fn.code
+			makeTheCall(vm)
 		}
-	})
+	} else {
+		cont = func(vm *VM) {
+			// normal call
+			// save the stack
+			newBase := len(vm.stack) - nargs
+			vm.callStack = append(vm.callStack, returnAddr{
+				pc:   next,
+				base: vm.base,
+				pos:  newBase,
+			})
+			vm.base = newBase
+			// make the call
+			makeTheCall(vm)
+		}
+	}
+	return compileList(exp, locals, frees, cont)
+}
+
+// makeTheCall handles the curry / partial calling protocol.
+func makeTheCall(vm *VM) {
+	fn := vm.stack[vm.base].(*Closure)
+	required := fn.Required + 1
+	provided := len(vm.stack) - vm.base
+	switch {
+	case provided == required:
+		vm.next = fn.code
+	case provided < required:
+		closed := append([]Obj{}, vm.stack[len(vm.stack)-provided:]...)
+		vm.val = &Closure{
+			code: func(vm *VM) {
+				tmp := append([]Obj{}, vm.stack[vm.base+1:]...)
+				vm.stack = append(vm.stack[:vm.base], closed...)
+				vm.stack = append(vm.stack, tmp...)
+				vm.next = makeTheCall
+			},
+			Required: required - provided,
+		}
+		vm.next = exit
+	case provided > required:
+		newBase := len(vm.stack)
+		vm.stack = append(vm.stack, vm.stack[vm.base:vm.base+required]...)
+		vm.callStack = append(vm.callStack, returnAddr{
+			pc: func(vm *VM) {
+				vm.stack[vm.base] = vm.val
+				vm.stack = append(vm.stack[:vm.base+1], vm.stack[vm.base+required:]...)
+				vm.next = makeTheCall
+			},
+			base: vm.base,
+			pos:  newBase,
+		})
+		vm.base = newBase
+		vm.next = fn.code
+	}
 }
 
 func compileList(exp Obj, locals Obj, frees Obj, next func(*VM)) func(*VM) {

@@ -17,7 +17,7 @@ type SexpReader struct {
 
 func NewSexpReader(r io.Reader) *SexpReader {
 	return &SexpReader{
-		reader:   bufio.NewReader(r),
+		reader: bufio.NewReader(r),
 	}
 }
 

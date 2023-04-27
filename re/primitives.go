@@ -128,8 +128,8 @@ func PrimNS3Value(key Obj) Obj {
 
 func init() {
 	// for _, item := range klPrimitives {
-		// sym := MakeSymbol(item.name)
-		// sym.val = MakePrimitive(item.name, item.arity, item.fn)
+	// sym := MakeSymbol(item.name)
+	// sym.val = MakePrimitive(item.name, item.arity, item.fn)
 	// }
 	// Overload for Primitive set and value.
 	MakeSymbol("*stinput*").val = Stream{os.Stdin}
@@ -486,7 +486,6 @@ func PrimEqual(x, y Obj) Obj {
 // 	return MakeSymbol(str)
 // }
 
-
 // func primLoadFile(e *VM) {
 // 	path := e.pop().(String)
 // 	res := loadFile(e, string(path))
@@ -512,7 +511,6 @@ func PrimEqual(x, y Obj) Obj {
 // 	// }
 // 	return String(file)
 // }
-
 
 // func loadFileFromReader(ctx *VM, r *SexpReader) Obj {
 // 	for {
@@ -565,7 +563,6 @@ func PrimEqual(x, y Obj) Obj {
 // // 	e.Return(reverse(ret))
 // // 	return
 // // }
-
 
 // // func writeSexpToFile(e *VM) {
 // // 	filePath := mustString(e.Get(1))
