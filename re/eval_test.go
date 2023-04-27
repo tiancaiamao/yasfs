@@ -245,7 +245,6 @@ func evalString(ctx *VM, exp string) Obj {
 // 	fmt.Println(res.String())
 // }
 
-
 func TestClosureConvert(t *testing.T) {
 	// r := NewSexpReader(strings.NewReader(`(lambda (x) x)`))
 	// r := NewSexpReader(strings.NewReader(`(lambda (z) (+ x z))`))
